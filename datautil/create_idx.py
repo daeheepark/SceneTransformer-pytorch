@@ -3,8 +3,8 @@ import os.path
 import glob
 from tqdm import tqdm
 
-tfrecord_path = './data/tfrecords_tmp'
-idx_path = './data/idxs_tmp'
+tfrecord_path = './data/tfrecords'
+idx_path = './data/idxs'
 batch_size=2
 
 for tfrecord in tqdm(glob.glob(tfrecord_path+'/*')):

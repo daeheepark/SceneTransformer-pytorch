@@ -46,24 +46,24 @@ class Encoder(nn.Module):
         self.layer_C.apply(init_xavier_glorot)
  
         # layer D,E,F,G,H,I : input -> [A,T,D] / outpu -> [A,T,D]
-        self.layer_D = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
-        self.layer_E = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
-        self.layer_F = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
-        self.layer_G = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
-        self.layer_H = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
-        self.layer_I = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
+        self.layer_D = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
+        self.layer_E = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
+        self.layer_F = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
+        self.layer_G = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
+        self.layer_H = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
+        self.layer_I = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
 
-        self.layer_J = CrossAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k)
-        self.layer_K = CrossAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k)
+        self.layer_J = CrossAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k)
+        self.layer_K = CrossAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k)
 
-        self.layer_L = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
-        self.layer_M = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
+        self.layer_L = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
+        self.layer_M = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
 
-        self.layer_N = CrossAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k)
-        self.layer_O = CrossAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k)
+        self.layer_N = CrossAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k)
+        self.layer_O = CrossAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k)
 
-        self.layer_P = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
-        self.layer_Q = SelfAttLayer_Enc(self.device, self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
+        self.layer_P = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
+        self.layer_Q = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
         
 
     def forward(self, state_feat, agent_batch_mask, padding_mask, hidden_mask, 

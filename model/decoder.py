@@ -22,11 +22,11 @@ class Decoder(nn.Module):
         self.layer_T = nn.Sequential(nn.Linear(self.feature_dim+self.F,feature_dim), nn.ReLU())
         self.layer_T.apply(init_xavier_glorot)
 
-        self.layer_U = SelfAttLayer_Dec(self.device,self.time_steps,self.feature_dim,self.head_num,self.k,across_time=True)
-        self.layer_V = SelfAttLayer_Dec(self.device,self.time_steps,self.feature_dim,self.head_num,self.k,across_time=False)
+        self.layer_U = SelfAttLayer_Dec(self.time_steps,self.feature_dim,self.head_num,self.k,across_time=True)
+        self.layer_V = SelfAttLayer_Dec(self.time_steps,self.feature_dim,self.head_num,self.k,across_time=False)
 
-        self.layer_W = SelfAttLayer_Dec(self.device,self.time_steps,self.feature_dim,self.head_num,self.k,across_time=True)
-        self.layer_X = SelfAttLayer_Dec(self.device,self.time_steps,self.feature_dim,self.head_num,self.k,across_time=False)
+        self.layer_W = SelfAttLayer_Dec(self.time_steps,self.feature_dim,self.head_num,self.k,across_time=True)
+        self.layer_X = SelfAttLayer_Dec(self.time_steps,self.feature_dim,self.head_num,self.k,across_time=False)
 
         self.layer_Y = nn.LayerNorm(self.feature_dim)
 

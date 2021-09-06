@@ -29,12 +29,13 @@ def main(cfg):
                                 cfg.model.time_steps, cfg.model.feature_dim, cfg.model.head_num, cfg.model.k, cfg.model.F)
 
     trainer = pl.Trainer(max_epochs=cfg.max_epochs, gpus=cfg.device_num, gradient_clip_val=5,accelerator='ddp')
-    try:
-        trainer.fit(model, dloader_train, dloader_valid)
-    except Exception as e:
-        print('fit error: ',e)
-        import pdb
-        pdb.set_trace()
+    trainer.fit(model, dloader_train, dloader_valid)
+    # try:
+    #     trainer.fit(model, dloader_train, dloader_valid)
+    # except Exception as e:
+    #     print('fit error: ',e)
+    #     import ipdb
+    #     ipdb.set_trace()
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -324,7 +324,7 @@ class WaymoDataset(MultiTFRecordDataset):
 
     def __len__(self):
         if self.num_samples is not None:
-            return int(self.num_samples/3)
+            return int(self.num_samples)
         else:
             raise NotImplementedError()
 

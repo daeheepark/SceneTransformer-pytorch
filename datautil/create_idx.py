@@ -3,10 +3,6 @@ import os.path
 import glob
 from tqdm import tqdm
 
-#tfrecord_path = './data/tf_example/validation'
-#idx_path = './data/idxs_validation_bs_2'
-#batch_size = 2
-
 tfrecord_path = './data/tfrecords_tmp'
 idx_path = './data/idxs_tmp'
 batch_size=2

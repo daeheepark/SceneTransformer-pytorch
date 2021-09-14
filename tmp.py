@@ -1,79 +1,28 @@
-import torch
-from torch.utils.data import DataLoader
+import tensorflow as tf
+from tqdm import tqdm
+import glob, os, sys
 
-from model.encoder import Encoder
-from model.decoder import Decoder
-from datautil.waymo_dataset import WaymoDataset, waymo_collate_fn
-from datautil.waymo_local_dataset import waymo_local_collate_fn
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 
-dataset = WaymoDataset('./data/tfrecords', './data/idxs')
-dataloader = DataLoader(dataset, batch_size=1, collate_fn=lambda x: waymo_local_collate_fn(x))
+from datautil.waymo_tfrecord_dataset import WaymoTFDataset, waymo_collate_fn
+filenames = glob.glob('data/tfrecords'+'/*')
+dataset = WaymoTFDataset(filenames)
+loader = DataLoader(dataset, batch_size=1, collate_fn=waymo_collate_fn)
 
-data0 = next(iter(dataloader))
+from datautil.waymo_dataset import WaymoDataset, waymo_collate_fn, waymo_worker_fn
+filenames = 'data/tf_example/training'
+idxs = 'data/idxs_training_bs_8'
+bs = 8
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-print(device)
-
-states_batch, agents_batch_mask, states_padding_mask_batch, \
-                (states_hidden_mask_BP, states_hidden_mask_CBP, states_hidden_mask_GDP), \
-                    roadgraph_feat_batch, roadgraph_valid_batch, traffic_light_feat_batch, traffic_light_valid_batch, \
-                        agent_rg_mask, agent_traffic_mask = data0
-
-states_batch, agents_batch_mask, states_padding_mask_batch, \
-                (states_hidden_mask_BP, states_hidden_mask_CBP, states_hidden_mask_GDP), \
-                    roadgraph_feat_batch, roadgraph_valid_batch, traffic_light_feat_batch, traffic_light_valid_batch, \
-                        agent_rg_mask, agent_traffic_mask = states_batch.to(device), agents_batch_mask.to(device), states_padding_mask_batch.to(device), \
-                                                                        (states_hidden_mask_BP.to(device), states_hidden_mask_CBP.to(device), states_hidden_mask_GDP.to(device)), \
-                                                                            roadgraph_feat_batch.to(device), roadgraph_valid_batch.to(device), traffic_light_feat_batch.to(device), traffic_light_valid_batch.to(device), \
-                                                                                agent_rg_mask.to(device), agent_traffic_mask.to(device)
-
-encoder = Encoder(device, in_feat_dim=states_batch.shape[-1], in_dynamic_rg_dim=traffic_light_feat_batch.shape[-1], in_static_rg_dim=roadgraph_feat_batch.shape[-1], time_steps=states_batch.shape[1])
-encoder = encoder.to(device)
-
-decoder = Decoder(device)
-decoder = decoder.to(device)
-
-# TODO : randomly select hidden mask
-states_hidden_mask_batch = states_hidden_mask_BP
-
-no_nonpad_mask = torch.sum((~states_padding_mask_batch*~states_hidden_mask_batch),dim=-1) != 0
-# no_nonpad_mask *= (states_padding_mask_batch.sum(dim=-1) < 85)
-no_nonpad_mask *= ~states_padding_mask_batch[:,4]
-
-states_batch = states_batch[no_nonpad_mask]
-agents_batch_mask = agents_batch_mask[no_nonpad_mask][:,no_nonpad_mask]
-states_padding_mask_batch = states_padding_mask_batch[no_nonpad_mask]
-states_hidden_mask_batch = states_hidden_mask_batch[no_nonpad_mask]
-agent_rg_mask = agent_rg_mask[no_nonpad_mask]
-agent_traffic_mask = agent_traffic_mask[no_nonpad_mask]
-
-encodings = encoder(states_batch, agents_batch_mask, states_padding_mask_batch, states_hidden_mask_batch, 
-                        roadgraph_feat_batch, roadgraph_valid_batch, traffic_light_feat_batch, traffic_light_valid_batch,
-                            agent_rg_mask, agent_traffic_mask)
-
-print(encodings)
-
-# decoding = decoder(encodings, agents_batch_mask, states_padding_mask_batch, 
-#                         states_hidden_mask_batch)
-
-# print(decoding.shape)
-
-# to_predict_mask = states_padding_mask_batch*states_hidden_mask_batch
-
-# current_xy = states_batch[:,10,:2]  
-# gt = states_batch[:,:,:2] - current_xy[:,None,:].repeat(1,91,1)
-
-# gt = gt[to_predict_mask] # 6 channel output : x, y, bbox_yaw, velocity_x, velocity_y, vel_yaw
-
-# prediction = decoding.permute(1,2,0,3)[to_predict_mask]
-# print(prediction)
-
-# print(prediction)
-
-# def some_loss_function(*args):
-#     return 0
-
-# loss = some_loss_function(gt, prediction)
-
-# # TODO : training code
+# filename = '/home/user/daehee/SceneTransformer-pytorch/datautil/tmp.txt'
+# if os.path.isfile(filename):
+#     os.remove(filename)
+# f = open(filename, 'w')
+# for ep in range(2):
+#     for it, d in enumerate(tqdm(loader)):
+#         f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
+#         if it % 100 == 0:
+#             print(ep, ' ', it, ' : ', d[0][0][0][:2])
+#     dataset.tfdataset = dataset.tfdataset.shuffle(1)
+# f.close()
+# sys.exit()

@@ -5,6 +5,7 @@ import torch.nn.functional as FU
 from model.utils import *
 
 from collections import OrderedDict
+import copy
 
 class Decoder(nn.Module):
     def __init__(self, device, time_steps=91, feature_dim=256, head_num=4, k=4, F=6):
@@ -38,8 +39,8 @@ class Decoder(nn.Module):
     def forward(self, state_feat, batch_mask, padding_mask, hidden_mask=None):
         A,T,D = state_feat.shape
         assert (T==self.time_steps and D==self.feature_dim)
-
-        onehots_ = self.onehots_.repeat(1,A,T,1)
+        onehots_ = copy.deepcopy(self.onehots_)
+        onehots_ = onehots_.repeat(1,A,T,1)
         onehots_ = onehots_.to(state_feat.device)
         x = state_feat.unsqueeze(0).repeat(self.F,1,1,1)    # [F,A,T,D]
 

@@ -1,142 +1,154 @@
 import math
-import os, sys
+import os, glob
 import uuid
 import time
 
-import numpy as np
-import torch
-from tfrecord.torch.dataset import TFRecordDataset, MultiTFRecordDataset
+from matplotlib import cm
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
 
+import numpy as np
+from IPython.display import HTML
+import itertools
+import tensorflow as tf
+
+import torch
+from torch.utils.data import Dataset, IterableDataset
+
+from google.protobuf import text_format
+# from waymo_open_dataset.metrics.ops import py_metrics_ops
+# from waymo_open_dataset.metrics.python import config_util_py as config_util
+# from waymo_open_dataset.protos import motion_metrics_pb2
 
 # Example field definition
 roadgraph_features = {
     'roadgraph_samples/dir':
-        'float',
+        tf.io.FixedLenFeature([20000, 3], tf.float32, default_value=None),
     'roadgraph_samples/id':
-        'int',
+        tf.io.FixedLenFeature([20000, 1], tf.int64, default_value=None),
     'roadgraph_samples/type':
-        'int',
+        tf.io.FixedLenFeature([20000, 1], tf.int64, default_value=None),
     'roadgraph_samples/valid':
-        'int',
+        tf.io.FixedLenFeature([20000, 1], tf.int64, default_value=None),
     'roadgraph_samples/xyz':
-        'float',
+        tf.io.FixedLenFeature([20000, 3], tf.float32, default_value=None),
 }
 
 # Features of other agents.
 state_features = {
     'state/id':
-        'float',
+        tf.io.FixedLenFeature([128], tf.float32, default_value=None),
     'state/type':
-        'float',
+        tf.io.FixedLenFeature([128], tf.float32, default_value=None),
     'state/is_sdc':
-        'int',
+        tf.io.FixedLenFeature([128], tf.int64, default_value=None),
     'state/tracks_to_predict':
-        'int',
+        tf.io.FixedLenFeature([128], tf.int64, default_value=None),
     'state/current/bbox_yaw':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/height':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/length':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/timestamp_micros':
-        'int',
+        tf.io.FixedLenFeature([128, 1], tf.int64, default_value=None),
     'state/current/valid':
-        'int',
+        tf.io.FixedLenFeature([128, 1], tf.int64, default_value=None),
     'state/current/vel_yaw':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/velocity_x':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/velocity_y':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/width':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/x':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/y':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/current/z':
-        'float',
+        tf.io.FixedLenFeature([128, 1], tf.float32, default_value=None),
     'state/future/bbox_yaw':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/height':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/length':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/timestamp_micros':
-        'int',
+        tf.io.FixedLenFeature([128, 80], tf.int64, default_value=None),
     'state/future/valid':
-        'int',
+        tf.io.FixedLenFeature([128, 80], tf.int64, default_value=None),
     'state/future/vel_yaw':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/velocity_x':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/velocity_y':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/width':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/x':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/y':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/future/z':
-        'float',
+        tf.io.FixedLenFeature([128, 80], tf.float32, default_value=None),
     'state/past/bbox_yaw':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/height':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/length':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/timestamp_micros':
-        'int',
+        tf.io.FixedLenFeature([128, 10], tf.int64, default_value=None),
     'state/past/valid':
-        'int',
+        tf.io.FixedLenFeature([128, 10], tf.int64, default_value=None),
     'state/past/vel_yaw':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/velocity_x':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/velocity_y':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/width':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/x':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/y':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
     'state/past/z':
-        'float',
+        tf.io.FixedLenFeature([128, 10], tf.float32, default_value=None),
 }
 
 traffic_light_features = {
     'traffic_light_state/current/state':
-        'int',
+        tf.io.FixedLenFeature([1, 16], tf.int64, default_value=None),
     'traffic_light_state/current/valid':
-        'int',
+        tf.io.FixedLenFeature([1, 16], tf.int64, default_value=None),
     'traffic_light_state/current/x':
-        'float',
+        tf.io.FixedLenFeature([1, 16], tf.float32, default_value=None),
     'traffic_light_state/current/y':
-        'float',
+        tf.io.FixedLenFeature([1, 16], tf.float32, default_value=None),
     'traffic_light_state/current/z':
-        'float',
+        tf.io.FixedLenFeature([1, 16], tf.float32, default_value=None),
     'traffic_light_state/past/state':
-        'int',
+        tf.io.FixedLenFeature([10, 16], tf.int64, default_value=None),
     'traffic_light_state/past/valid':
-        'int',
+        tf.io.FixedLenFeature([10, 16], tf.int64, default_value=None),
     'traffic_light_state/past/x':
-        'float',
+        tf.io.FixedLenFeature([10, 16], tf.float32, default_value=None),
     'traffic_light_state/past/y':
-        'float',
+        tf.io.FixedLenFeature([10, 16], tf.float32, default_value=None),
     'traffic_light_state/past/z':
-        'float',
+        tf.io.FixedLenFeature([10, 16], tf.float32, default_value=None),
     'traffic_light_state/future/state':
-        'int',
+        tf.io.FixedLenFeature([80, 16], tf.int64, default_value=None),
     'traffic_light_state/future/valid':
-        'int',
+        tf.io.FixedLenFeature([80, 16], tf.int64, default_value=None),
     'traffic_light_state/future/x':
-        'float',
+        tf.io.FixedLenFeature([80, 16], tf.float32, default_value=None),
     'traffic_light_state/future/y':
-        'float',
+        tf.io.FixedLenFeature([80, 16], tf.float32, default_value=None),
     'traffic_light_state/future/z':
-        'float',
+        tf.io.FixedLenFeature([80, 16], tf.float32, default_value=None),
 }
 
 features_description = {}
@@ -144,214 +156,75 @@ features_description.update(roadgraph_features)
 features_description.update(state_features)
 features_description.update(traffic_light_features)
 
+def _parse(value):
+  decoded_example = tf.io.parse_single_example(value, features_description)
 
-# Example field definition
-roadgraph_transforms = {
-    'roadgraph_samples/dir':
-        lambda x : np.reshape(x,(20000,3)),
-    'roadgraph_samples/id':
-        lambda x : np.reshape(x,(20000,1)),
-    'roadgraph_samples/type':
-        lambda x : np.reshape(x,(20000,1)),
-    'roadgraph_samples/valid':
-        lambda x : np.reshape(x,(20000,1)),
-    'roadgraph_samples/xyz':
-        lambda x : np.reshape(x,(20000,3)),
-}
+  past_states = tf.stack([
+      decoded_example['state/past/x'], decoded_example['state/past/y'],
+      decoded_example['state/past/length'], decoded_example['state/past/width'],
+      decoded_example['state/past/bbox_yaw'],
+      decoded_example['state/past/velocity_x'],
+      decoded_example['state/past/velocity_y']
+  ], -1)
 
-# Features of other agents.
-state_transforms = {
-    'state/id':
-        lambda x : np.reshape(x,(128,)),
-    'state/type':
-        lambda x : np.reshape(x,(128,)),
-    'state/is_sdc':
-        lambda x : np.reshape(x,(128,)),
-    'state/tracks_to_predict':
-        lambda x : np.reshape(x,(128,)),
-    'state/current/bbox_yaw':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/height':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/length':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/timestamp_micros':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/valid':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/vel_yaw':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/velocity_x':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/velocity_y':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/width':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/x':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/y':
-        lambda x : np.reshape(x,(128,1)),
-    'state/current/z':
-        lambda x : np.reshape(x,(128,1)),
-    'state/future/bbox_yaw':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/height':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/length':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/timestamp_micros':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/valid':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/vel_yaw':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/velocity_x':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/velocity_y':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/width':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/x':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/y':
-        lambda x : np.reshape(x,(128,80)),
-    'state/future/z':
-        lambda x : np.reshape(x,(128,80)),
-    'state/past/bbox_yaw':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/height':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/length':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/timestamp_micros':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/valid':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/vel_yaw':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/velocity_x':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/velocity_y':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/width':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/x':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/y':
-        lambda x : np.reshape(x,(128,10)),
-    'state/past/z':
-        lambda x : np.reshape(x,(128,10)),
-}
+  cur_states = tf.stack([
+      decoded_example['state/current/x'], decoded_example['state/current/y'],
+      decoded_example['state/current/length'],
+      decoded_example['state/current/width'],
+      decoded_example['state/current/bbox_yaw'],
+      decoded_example['state/current/velocity_x'],
+      decoded_example['state/current/velocity_y']
+  ], -1)
 
-traffic_light_transforms = {
-    'traffic_light_state/current/state':
-        lambda x : np.reshape(x,(1,16)),
-    'traffic_light_state/current/valid':
-        lambda x : np.reshape(x,(1,16)),
-    'traffic_light_state/current/x':
-        lambda x : np.reshape(x,(1,16)),
-    'traffic_light_state/current/y':
-        lambda x : np.reshape(x,(1,16)),
-    'traffic_light_state/current/z':
-        lambda x : np.reshape(x,(1,16)),
-    'traffic_light_state/past/state':
-        lambda x : np.reshape(x,(10,16)),
-    'traffic_light_state/past/valid':
-        lambda x : np.reshape(x,(10,16)),
-    'traffic_light_state/past/x':
-        lambda x : np.reshape(x,(10,16)),
-    'traffic_light_state/past/y':
-        lambda x : np.reshape(x,(10,16)),
-    'traffic_light_state/past/z':
-        lambda x : np.reshape(x,(10,16)),
-    'traffic_light_state/future/state':
-        lambda x : np.reshape(x,(80,16)),
-    'traffic_light_state/future/valid':
-        lambda x : np.reshape(x,(80,16)),
-    'traffic_light_state/future/x':
-        lambda x : np.reshape(x,(80,16)),
-    'traffic_light_state/future/y':
-        lambda x : np.reshape(x,(80,16)),
-    'traffic_light_state/future/z':
-        lambda x : np.reshape(x,(80,16)),
-}
+  input_states = tf.concat([past_states, cur_states], 1)[..., :2]
 
-features_transforms = {}
-features_transforms.update(roadgraph_transforms)
-features_transforms.update(state_transforms)
-features_transforms.update(traffic_light_transforms)
+  future_states = tf.stack([
+      decoded_example['state/future/x'], decoded_example['state/future/y'],
+      decoded_example['state/future/length'],
+      decoded_example['state/future/width'],
+      decoded_example['state/future/bbox_yaw'],
+      decoded_example['state/future/velocity_x'],
+      decoded_example['state/future/velocity_y']
+  ], -1)
 
-def transform_func(feature):
-    transform = features_transforms
-    keys = transform.keys()
-    for key in keys:
-        func = transform[key]
-        feat = feature[key]
-        feature[key] = func(feat)
-    return feature
+  gt_future_states = tf.concat([past_states, cur_states, future_states], 1)
 
-class WaymoDataset(MultiTFRecordDataset):
-    def __init__(self, tfrecord_dir, idx_dir):
-        super(WaymoDataset, self).__init__(tfrecord_dir+'/{}',idx_dir+'/{}',{})
-        self.splits = {}
-        fnlist = os.listdir(self.data_pattern.split('{}')[0])
-        for fn in fnlist:
-            self.splits[fn] = 1/len(fnlist)
-        
-        self.description = features_description
-        self.sequence_discription = None
-        self.shuffle_queue_size = None
-        self.transform = transform_func
-        self.infinite = False
+  past_is_valid = decoded_example['state/past/valid'] > 0
+  current_is_valid = decoded_example['state/current/valid'] > 0
+  future_is_valid = decoded_example['state/future/valid'] > 0
+  gt_future_is_valid = tf.concat(
+      [past_is_valid, current_is_valid, future_is_valid], 1)
 
-        if self.index_pattern is not None:
-            self.num_samples = sum(
-                sum(1 for _ in open(self.index_pattern.format(split)))
-                for split in self.splits
-            )
-        else:
-            self.num_samples = None
+  # If a sample was not seen at all in the past, we declare the sample as
+  # invalid.
+  sample_is_valid = tf.reduce_any(
+      tf.concat([past_is_valid, current_is_valid], 1), 1)
 
-    def __len__(self):
-        if self.num_samples is not None:
-            return int(self.num_samples)
-        else:
-            raise NotImplementedError()
+  inputs = {
+      'input_states': input_states,
+      'gt_future_states': gt_future_states,
+      'gt_future_is_valid': gt_future_is_valid,
+      'object_type': decoded_example['state/type'],
+      'tracks_to_predict': decoded_example['state/tracks_to_predict'] > 0,
+      'sample_is_valid': sample_is_valid,
+  }
+  return inputs
 
-class WaymoCustomDataset(torch.utils.data.IterableDataset):
-    def __init__(self, data_pattern, index_pattern):
-        super(WaymoCustomDataset, self).__init__()
+class WaymoTFDataset(IterableDataset):
+    def __init__(self, filenames, shuffle=False):
+        self.tfdataset = tf.data.TFRecordDataset(filenames)
+        if shuffle:
+            self.tfdataset = self.tfdataset.shuffle(1)
+        self.num_samples = sum(1 for _ in self.tfdataset)
 
-        self.data_pattern = data_pattern
-        self.index_pattern = index_pattern
+    # def __len__(self):
+    #     return self.num_samples
 
-        self.splits = {}
-        fnlist = os.listdir(self.data_pattern.split('{}')[0])
-        for fn in fnlist:
-            self.splits[fn] = 1/len(fnlist)
-        
-        self.description = features_description
-        self.sequence_discription = None
-        self.shuffle_queue_size = None
-        self.transform = transform_func
-        self.infinite = False
-
-        if self.index_pattern is not None:
-            self.num_samples = sum(
-                sum(1 for _ in open(self.index_pattern.format(split)))
-                for split in self.splits
-            )
-        else:
-            self.num_samples = None
-
-    def __len__(self):
-        if self.num_samples is not None:
-            return int(self.num_samples)
-        else:
-            raise NotImplementedError()
-
+    def __iter__(self):
+        return self.tfdataset.as_numpy_iterator()
 
 def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD=16, GS=1400, is_local=True, halfwidth=100, only_veh=True): # GS = max number of static roadgraph element (1400), GD = max number of dynamic roadgraph (16)
+    
     sampling_freq = int(sampling_time/0.1)
     assert sampling_freq == sampling_time/0.1
     states_batch = np.array([]).reshape(-1,time_steps,9)
@@ -372,19 +245,20 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
     num_tl = np.array([])
 
     for data in batch:
+        data = tf.io.parse_single_example(data, features_description)
         # State of Agents
         past_states = np.stack((data['state/past/x'],data['state/past/y'],data['state/past/bbox_yaw'],
                                     data['state/past/velocity_x'],data['state/past/velocity_y'],data['state/past/vel_yaw'],
                                         data['state/past/width'],data['state/past/length'],data['state/past/timestamp_micros']), axis=-1)
-        past_states_valid = data['state/past/valid'] > 0.
+        past_states_valid = data['state/past/valid'] > 0
         current_states = np.stack((data['state/current/x'],data['state/current/y'],data['state/current/bbox_yaw'],
                                     data['state/current/velocity_x'],data['state/current/velocity_y'],data['state/current/vel_yaw'],
                                         data['state/current/width'],data['state/current/length'],data['state/current/timestamp_micros']), axis=-1)
-        current_states_valid = data['state/current/valid'] > 0.
+        current_states_valid = data['state/current/valid'] > 0
         future_states = np.stack((data['state/future/x'],data['state/future/y'],data['state/future/bbox_yaw'],
                                     data['state/future/velocity_x'],data['state/future/velocity_y'],data['state/future/vel_yaw'],
                                         data['state/future/width'],data['state/future/length'],data['state/future/timestamp_micros']), axis=-1)
-        future_states_valid = data['state/future/valid'] > 0.
+        future_states_valid = data['state/future/valid'] > 0
 
         states_feat = np.concatenate((past_states,current_states,future_states),axis=1)                             # [A,T,D]
         states_padding = ~np.concatenate((past_states_valid,current_states_valid,future_states_valid), axis=1) # [A,T]
@@ -407,7 +281,7 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
         # Static Road Graph
         roadgraph_feat = np.concatenate((data['roadgraph_samples/xyz'][:,:2], data['roadgraph_samples/dir'][:,:2],
                                             data['roadgraph_samples/type'], data['roadgraph_samples/id']), axis=-1)
-        roadgraph_valid = data['roadgraph_samples/valid'] > 0.
+        roadgraph_valid = data['roadgraph_samples/valid'] > 0
 
         roadgraph_feat = roadgraph_feat[roadgraph_valid[:,0]]
         roadgraph_valid = np.ones((roadgraph_feat.shape[0],1)).astype(np.bool_)
@@ -417,12 +291,12 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
         roadgraph_padding = ~roadgraph_valid
 
         # Dynamic Road Graph
-        traffic_light_states_past = np.stack((data['traffic_light_state/past/x'].T,data['traffic_light_state/past/y'].T,data['traffic_light_state/past/state'].T),axis=-1)
-        traffic_light_valid_past = data['traffic_light_state/past/valid'].T > 0.
-        traffic_light_states_current = np.stack((data['traffic_light_state/current/x'].T,data['traffic_light_state/current/y'].T,data['traffic_light_state/current/state'].T),axis=-1)
-        traffic_light_valid_current = data['traffic_light_state/current/valid'].T > 0.
-        traffic_light_states_future = np.stack((data['traffic_light_state/future/x'].T,data['traffic_light_state/future/y'].T,data['traffic_light_state/future/state'].T),axis=-1)
-        traffic_light_valid_future = data['traffic_light_state/future/valid'].T > 0.
+        traffic_light_states_past = np.stack((np.transpose(data['traffic_light_state/past/x']),np.transpose(data['traffic_light_state/past/y']),np.transpose(data['traffic_light_state/past/state'])),axis=-1)
+        traffic_light_valid_past = np.transpose(data['traffic_light_state/past/valid']) > 0
+        traffic_light_states_current = np.stack((np.transpose(data['traffic_light_state/current/x']),np.transpose(data['traffic_light_state/current/y']),np.transpose(data['traffic_light_state/current/state'])),axis=-1)
+        traffic_light_valid_current = np.transpose(data['traffic_light_state/current/valid']) > 0
+        traffic_light_states_future = np.stack((np.transpose(data['traffic_light_state/future/x']),np.transpose(data['traffic_light_state/future/y']),np.transpose(data['traffic_light_state/future/state'])),axis=-1)
+        traffic_light_valid_future = np.transpose(data['traffic_light_state/future/valid']) > 0
 
         traffic_light_feat = np.concatenate((traffic_light_states_past,traffic_light_states_current,traffic_light_states_future),axis=1)
         traffic_light_valid = np.concatenate((traffic_light_valid_past,traffic_light_valid_current,traffic_light_valid_future),axis=1)
@@ -538,45 +412,3 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
                 (states_hidden_BP_batch, states_hidden_CBP_batch, states_hidden_GDP_batch), 
                     roadgraph_feat_batch, roadgraph_padding_batch, traffic_light_feat_batch, traffic_light_padding_batch,
                         agent_rg_mask, agent_traffic_mask)
-
-if __name__ == '__main__':
-    import hydra, os
-    from torch.utils.data import DataLoader
-    from tqdm import tqdm
-    @hydra.main(config_path='../conf', config_name='config.yaml')
-    def main(cfg):
-        filename = '/home/user/daehee/SceneTransformer-pytorch/datautil/tmp.txt'
-        if os.path.isfile(filename):
-            os.remove(filename)
-        f = open(filename, 'w')
-        pwd = hydra.utils.get_original_cwd() + '/'
-        dataset_train = WaymoDataset(pwd+cfg.dataset.train.tfrecords, pwd+cfg.dataset.train.idxs)
-        # print(len(dataset_train))
-        dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, num_workers=16, shuffle=False)
-        for ep in range(2):
-            for it, d in enumerate(tqdm(dloader_train)):
-                f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
-                if it % 500 == 0:
-                    print(ep, ' ', it, ' : ', d[0][0][0][:2])
-        f.close()
-    
-    import tensorflow as tf
-    @hydra.main2(config_path='../conf', config_name='config.yaml')
-    def main2(cfg):
-        filename = '/home/user/daehee/SceneTransformer-pytorch/datautil/tmp.txt'
-        if os.path.isfile(filename):
-            os.remove(filename)
-        f = open(filename, 'w')
-        pwd = hydra.utils.get_original_cwd() + '/'
-        dataset_train = WaymoDataset(pwd+cfg.dataset.train.tfrecords, pwd+cfg.dataset.train.idxs)
-        # print(len(dataset_train))
-        dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, num_workers=16, shuffle=False)
-        for ep in range(2):
-            for it, d in enumerate(tqdm(dloader_train)):
-                f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
-                if it % 500 == 0:
-                    print(ep, ' ', it, ' : ', d[0][0][0][:2])
-        f.close()
-
-    sys.exit(main2())
-

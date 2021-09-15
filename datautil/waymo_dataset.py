@@ -5,7 +5,9 @@ import time
 
 import numpy as np
 import torch
-from tfrecord.torch.dataset import TFRecordDataset, MultiTFRecordDataset
+from tfrecord.torch.dataset import MultiTFRecordDataset
+from tfrecordutils import reader
+from tfrecordutils import iterator_utils
 
 
 # Example field definition
@@ -318,6 +320,33 @@ class WaymoDataset(MultiTFRecordDataset):
         else:
             raise NotImplementedError()
 
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
+            np.random.seed(worker_info.seed % np.iinfo(np.uint32).max)
+            # dataset = worker_info.dataset
+            worker_id = worker_info.id
+            assert len(self.splits) >= worker_info.num_workers, 'num_workers should be smaller than number of splits'
+            split_size = len(self.splits) // worker_info.num_workers
+            overall_end = len(self.splits)
+            if not len(self.splits) - (worker_id+1)*split_size < split_size:
+                self.splits = dict(list(self.splits.items())[worker_id*split_size:(worker_id+1)*split_size])
+            else:
+                self.splits = dict(list(self.splits.items())[worker_id*split_size:overall_end])
+        it = reader.multi_tfrecord_loader(data_pattern=self.data_pattern,
+                                          index_pattern=self.index_pattern,
+                                          splits=self.splits,
+                                          description=self.description,
+                                          sequence_description=self.sequence_description,
+                                          compression_type=self.compression_type,
+                                          infinite=self.infinite,
+                                         )
+        if self.shuffle_queue_size:
+            it = iterator_utils.shuffle_iterator(it, self.shuffle_queue_size)
+        if self.transform:
+            it = map(self.transform, it)
+        return it
+
 class WaymoCustomDataset(torch.utils.data.IterableDataset):
     def __init__(self, data_pattern, index_pattern):
         super(WaymoCustomDataset, self).__init__()
@@ -349,6 +378,33 @@ class WaymoCustomDataset(torch.utils.data.IterableDataset):
             return int(self.num_samples)
         else:
             raise NotImplementedError()
+    
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
+            np.random.seed(worker_info.seed % np.iinfo(np.uint32).max)
+            # dataset = worker_info.dataset
+            worker_id = worker_info.id
+            assert len(self.splits) >= worker_info.num_workers, 'num_workers should be smaller than number of splits'
+            split_size = len(self.splits) // worker_info.num_workers
+            overall_end = len(self.splits)
+            if not len(self.splits) - (worker_id+1)*split_size < split_size:
+                self.splits = dict(list(self.splits.items())[worker_id*split_size:(worker_id+1)*split_size])
+            else:
+                self.splits = dict(list(self.splits.items())[worker_id*split_size:overall_end])
+        it = reader.multi_tfrecord_loader(data_pattern=self.data_pattern,
+                                          index_pattern=self.index_pattern,
+                                          splits=self.splits,
+                                          description=self.description,
+                                          sequence_description=self.sequence_description,
+                                          compression_type=self.compression_type,
+                                          infinite=self.infinite,
+                                         )
+        if self.shuffle_queue_size:
+            it = iterator_utils.shuffle_iterator(it, self.shuffle_queue_size)
+        if self.transform:
+            it = map(self.transform, it)
+        return it
 
 
 def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD=16, GS=1400, is_local=True, halfwidth=100, only_veh=True): # GS = max number of static roadgraph element (1400), GD = max number of dynamic roadgraph (16)
@@ -538,6 +594,21 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
                 (states_hidden_BP_batch, states_hidden_CBP_batch, states_hidden_GDP_batch), 
                     roadgraph_feat_batch, roadgraph_padding_batch, traffic_light_feat_batch, traffic_light_padding_batch,
                         agent_rg_mask, agent_traffic_mask)
+
+# def waymo_worker_fn(wid):
+#     worker_info = torch.utils.data.get_worker_info()
+    
+#     dataset = worker_info.dataset
+#     worker_id = worker_info.id
+#     assert len(dataset.splits) >= worker_info.num_workers, 'num_workers should be smaller than number of splits'
+#     split_size = len(dataset.splits) // worker_info.num_workers
+
+#     overall_end = len(dataset.splits)
+#     if not len(dataset.splits) - (worker_id+1)*split_size < split_size:
+#         dataset.splits = dict(list(dataset.splits.items())[worker_id*split_size:(worker_id+1)*split_size])
+#     else:
+#         dataset.splits = dict(list(dataset.splits.items())[worker_id*split_size:overall_end])
+
 
 if __name__ == '__main__':
     import hydra, os

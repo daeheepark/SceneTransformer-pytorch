@@ -75,7 +75,7 @@ class TFRecordDataset(torch.utils.data.IterableDataset):
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is not None:
             shard = worker_info.id, worker_info.num_workers
-            np.random.seed(worker_info.seed % np.iinfo(np.uint32).max)
+            # np.random.seed(worker_info.seed % np.iinfo(np.uint32).max)
         else:
             shard = None
         it = reader.tfrecord_loader(data_path=self.data_path,

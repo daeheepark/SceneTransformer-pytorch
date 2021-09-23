@@ -2,6 +2,7 @@ import math
 import os, sys
 import uuid
 import time
+import random
 
 import numpy as np
 import torch
@@ -293,12 +294,17 @@ def transform_func(feature):
     return feature
 
 class WaymoDataset(MultiTFRecordDataset):
-    def __init__(self, tfrecord_dir, idx_dir):
+    def __init__(self, tfrecord_dir, idx_dir, shuffle_first=False):
         super(WaymoDataset, self).__init__(tfrecord_dir+'/{}',idx_dir+'/{}',{})
         self.splits = {}
         fnlist = os.listdir(self.data_pattern.split('{}')[0])
         for fn in fnlist:
             self.splits[fn] = 1/len(fnlist)
+
+        if shuffle_first:
+            splitsl = list(self.splits.items())
+            random.shuffle(splitsl)
+            self.splits = dict(splitsl)
         
         self.description = features_description
         self.sequence_discription = None
@@ -320,65 +326,6 @@ class WaymoDataset(MultiTFRecordDataset):
         else:
             raise NotImplementedError()
 
-    def __iter__(self):
-        worker_info = torch.utils.data.get_worker_info()
-        if worker_info is not None:
-            np.random.seed(worker_info.seed % np.iinfo(np.uint32).max)
-            # dataset = worker_info.dataset
-            worker_id = worker_info.id
-            assert len(self.splits) >= worker_info.num_workers, 'num_workers should be smaller than number of splits'
-            split_size = len(self.splits) // worker_info.num_workers
-            overall_end = len(self.splits)
-            if not len(self.splits) - (worker_id+1)*split_size < split_size:
-                self.splits = dict(list(self.splits.items())[worker_id*split_size:(worker_id+1)*split_size])
-            else:
-                self.splits = dict(list(self.splits.items())[worker_id*split_size:overall_end])
-        it = reader.multi_tfrecord_loader(data_pattern=self.data_pattern,
-                                          index_pattern=self.index_pattern,
-                                          splits=self.splits,
-                                          description=self.description,
-                                          sequence_description=self.sequence_description,
-                                          compression_type=self.compression_type,
-                                          infinite=self.infinite,
-                                         )
-        if self.shuffle_queue_size:
-            it = iterator_utils.shuffle_iterator(it, self.shuffle_queue_size)
-        if self.transform:
-            it = map(self.transform, it)
-        return it
-
-class WaymoCustomDataset(torch.utils.data.IterableDataset):
-    def __init__(self, data_pattern, index_pattern):
-        super(WaymoCustomDataset, self).__init__()
-
-        self.data_pattern = data_pattern
-        self.index_pattern = index_pattern
-
-        self.splits = {}
-        fnlist = os.listdir(self.data_pattern.split('{}')[0])
-        for fn in fnlist:
-            self.splits[fn] = 1/len(fnlist)
-        
-        self.description = features_description
-        self.sequence_discription = None
-        self.shuffle_queue_size = None
-        self.transform = transform_func
-        self.infinite = False
-
-        if self.index_pattern is not None:
-            self.num_samples = sum(
-                sum(1 for _ in open(self.index_pattern.format(split)))
-                for split in self.splits
-            )
-        else:
-            self.num_samples = None
-
-    def __len__(self):
-        if self.num_samples is not None:
-            return int(self.num_samples)
-        else:
-            raise NotImplementedError()
-    
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is not None:

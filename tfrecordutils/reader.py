@@ -4,6 +4,7 @@ import functools
 import gzip
 import io
 import os
+from random import shuffle
 import struct
 import typing
 

@@ -1,21 +1,28 @@
-tag: ''
+mode: 'train' # 'train' or 'validate' or 'test'
+
+tag: 'halfwidth:50'
 verbose: true
 seed: 1234
 
 dataset:
   train:
-    tfrecords: 'data/tf_example/training'
-    idxs: 'data/idxs_training_bs_8'
-    batchsize: 8
+    tfrecords: 'data/uncompressed/tf_example/training'
+    idxs: 'data/tf_exmple_idxs/training/bs16'
+    batchsize: 16
   valid:
-    tfrecords: 'data/tf_example/validation'
-    idxs: 'data/idxs_validation_bs_8'
-    batchsize: 8
+    tfrecords: 'data/uncompressed/tf_example/validation'
+    idxs: 'data/tf_exmple_idxs/validation/bs16'
+    batchsize: 16
+  test:
+    tfrecords: 'data/uncompressed/tf_example/validation'
+    idxs: 'data/tf_exmple_idxs/validation/bs1'
+    batchsize: 1
+    ckpt_path: '/home/user/daehee/SceneTransformer-pytorch/outputs/2021-09-23/18-49-50_gpu45_local_veh_nogradclip/lightning_logs/version_0/checkpoints/epoch=11-step=359213.ckpt'
 
 # dataset:
 #   train:
-#     tfrecords: 'data/tfrecords'
-#     idxs: 'data/idxs'
+#     tfrecords: 'data/single_sample/data'
+#     idxs: 'data/single_sample/idxs'
 #     batchsize: 8
 #   valid:
 #     tfrecords: 'data/tfrecords'
@@ -33,11 +40,11 @@ model:
   k: 4
   F: 6
 
-device_ids: '4,5'
+device_ids: '0,1'
 device_num: 2
 max_epochs: 100
 
-hydra:
-  run:
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}_gpu45_local_veh_nogradclip
+# hydra:
+#   run:
+#     dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
 

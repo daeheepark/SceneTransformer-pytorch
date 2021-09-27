@@ -1,5 +1,7 @@
 # SceneTransformer-pytorch
 ## 1. Install dependencies
+* python==3.7
+* pytorch==1.9.0
 ```pip install -r requirements.txt```
 ## 2. Put tfrecord data file at ./data/tfrecords
 

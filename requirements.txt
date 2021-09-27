@@ -1,7 +1,7 @@
+# pip install --extra-index-url https://developer.download.nvidia.com/compute/redist --upgrade nvidia-dali-cuda110
 nvidia-pyindex
-nvidia-dali
+matplotlib==3.4.3
+tqdm==4.62.1
+pytorch-lightning==1.4.2
+hydra-core==1.1.0
 tfrecord
-matplotlib
-tqdm
-pytorch-lightning
-hydra-core

@@ -6,9 +6,17 @@ import random
 
 import numpy as np
 import torch
-from tfrecord.torch.dataset import MultiTFRecordDataset
-from tfrecordutils import reader
-from tfrecordutils import iterator_utils
+try:
+    from tfrecordutils.dataset import MultiTFRecordDataset
+    from tfrecordutils import reader
+    from tfrecordutils import iterator_utils
+except:
+    from os import path
+    print(path.dirname( path.dirname( path.abspath(__file__) ) ))
+    sys.path.append(path.dirname( path.dirname( path.abspath(__file__) ) ))
+    from tfrecordutils.dataset import MultiTFRecordDataset
+    from tfrecordutils import reader
+    from tfrecordutils import iterator_utils
 
 
 # Example field definition
@@ -294,23 +302,22 @@ def transform_func(feature):
     return feature
 
 class WaymoDataset(MultiTFRecordDataset):
-    def __init__(self, tfrecord_dir, idx_dir, shuffle_first=False):
-        super(WaymoDataset, self).__init__(tfrecord_dir+'/{}',idx_dir+'/{}',{})
+    def __init__(self, tfrecord_dir, idx_dir, shuffle_queue_size):
+        super(WaymoDataset, self).__init__(data_pattern=tfrecord_dir+'/{}',index_pattern=idx_dir+'/{}',splits={}, 
+                                            shuffle_queue_size=shuffle_queue_size, infinite=False)
         self.splits = {}
         fnlist = os.listdir(self.data_pattern.split('{}')[0])
         for fn in fnlist:
             self.splits[fn] = 1/len(fnlist)
 
-        if shuffle_first:
-            splitsl = list(self.splits.items())
-            random.shuffle(splitsl)
-            self.splits = dict(splitsl)
+        # if shuffle_first:
+        #     splitsl = list(self.splits.items())
+        #     random.shuffle(splitsl)
+        #     self.splits = dict(splitsl)
         
         self.description = features_description
         self.sequence_discription = None
-        self.shuffle_queue_size = None
         self.transform = transform_func
-        self.infinite = False
 
         if self.index_pattern is not None:
             self.num_samples = sum(
@@ -354,7 +361,7 @@ class WaymoDataset(MultiTFRecordDataset):
         return it
 
 
-def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD=16, GS=1400, is_local=True, halfwidth=100, only_veh=True): # GS = max number of static roadgraph element (1400), GD = max number of dynamic roadgraph (16)
+def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD=16, GS=1400, is_local=True, halfwidth=50, only_veh=True): # GS = max number of static roadgraph element (1400), GD = max number of dynamic roadgraph (16)
     sampling_freq = int(sampling_time/0.1)
     assert sampling_freq == sampling_time/0.1
     states_batch = np.array([]).reshape(-1,time_steps,9)
@@ -568,33 +575,18 @@ if __name__ == '__main__':
             os.remove(filename)
         f = open(filename, 'w')
         pwd = hydra.utils.get_original_cwd() + '/'
-        dataset_train = WaymoDataset(pwd+cfg.dataset.train.tfrecords, pwd+cfg.dataset.train.idxs)
+        dataset_train = WaymoDataset(pwd+cfg.dataset.train.tfrecords, pwd+cfg.dataset.train.idxs, shuffle_queue_size=None)
         # print(len(dataset_train))
-        dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, num_workers=16, shuffle=False)
+        dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, num_workers=2, shuffle=False)
         for ep in range(2):
             for it, d in enumerate(tqdm(dloader_train)):
-                f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
+                # f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
+                d_ = torch.reshape(d[4],(-1,1400,10,6))
+                # break
+                f.write(str(ep) + ' ' + str(it)+' : '+str(d_[:,0,0,:2])+'\n')
                 if it % 500 == 0:
                     print(ep, ' ', it, ' : ', d[0][0][0][:2])
         f.close()
     
-    import tensorflow as tf
-    @hydra.main2(config_path='../conf', config_name='config.yaml')
-    def main2(cfg):
-        filename = '/home/user/daehee/SceneTransformer-pytorch/datautil/tmp.txt'
-        if os.path.isfile(filename):
-            os.remove(filename)
-        f = open(filename, 'w')
-        pwd = hydra.utils.get_original_cwd() + '/'
-        dataset_train = WaymoDataset(pwd+cfg.dataset.train.tfrecords, pwd+cfg.dataset.train.idxs)
-        # print(len(dataset_train))
-        dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, num_workers=16, shuffle=False)
-        for ep in range(2):
-            for it, d in enumerate(tqdm(dloader_train)):
-                f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
-                if it % 500 == 0:
-                    print(ep, ' ', it, ' : ', d[0][0][0][:2])
-        f.close()
-
-    sys.exit(main2())
+    sys.exit(main())
 

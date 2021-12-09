@@ -103,8 +103,8 @@ class SelfAttLayer_Dec(nn.Module):
         assert (T==self.time_steps and D==self.feature_dim)
         A_,A__ = batch_mask.shape
         assert (A==A_ and A==A__)
-        A___,T_ = padding_mask.shape
-        assert (A==A___ and T==T_)
+        # A___,T_ = padding_mask.shape
+        # assert (A==A___ and T==T_)
 
         x_ = self.layer_X_(x)                                           # [F,A,T,D]
 
@@ -112,7 +112,7 @@ class SelfAttLayer_Dec(nn.Module):
             q = x_.reshape((-1,T,D)).permute(1,0,2)                     # [L,N,E] : [F,A,T,D]->[F*A,T,D]->[T,F*A,D]
             k,v = q, q                                                  # [S,N,E] : [T,F*A,D]
 
-            key_padding_mask = padding_mask.repeat(F,1)                 # [N,S] : [A*F,T]
+            key_padding_mask = None#padding_mask.repeat(F,1)                 # [N,S] : [A*F,T]
             attn_mask = None  
             # att_output : [L,N,E] : [T,F*A,D]
             att_output, _ = self.layer_att_(q,k,v,key_padding_mask=key_padding_mask,attn_mask=attn_mask)
@@ -122,7 +122,7 @@ class SelfAttLayer_Dec(nn.Module):
             q = x_.permute(0,2,1,3).reshape((-1,A,D)).permute(1,0,2)    # [L,N,E] : [F,A,T,D]->[F,T,A,D]->[F*T,A,D]->[A,T*F,D]
             k, v = q, q                                                 # [S,N,E] : [A,T*F,D]
 
-            key_padding_mask = padding_mask.permute(1,0).repeat(F,1)    # [N,S] = [T*F,A]
+            key_padding_mask = None#padding_mask.permute(1,0).repeat(F,1)    # [N,S] = [T*F,A]
             attn_mask = batch_mask                                      # [L,S] = [A,A]
             # att_output : [L,N,E] : [A,T*F,D]
             att_output, _ = self.layer_att_(q,k,v,key_padding_mask=key_padding_mask,attn_mask=attn_mask)

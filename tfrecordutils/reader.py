@@ -10,7 +10,11 @@ import typing
 
 import numpy as np
 
-from tfrecord import example_pb2
+# from os import path
+# import sys
+# print(path.dirname( path.dirname( path.abspath(__file__) ) ))
+# sys.path.append(path.dirname( path.dirname( path.abspath(__file__) ) ))
+from tfrecordutils import example_pb2
 from tfrecordutils import iterator_utils
 
 

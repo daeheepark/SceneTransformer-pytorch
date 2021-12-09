@@ -361,16 +361,14 @@ class WaymoDataset(MultiTFRecordDataset):
         return it
 
 
-def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD=16, GS=1400, is_local=True, halfwidth=50, only_veh=True): # GS = max number of static roadgraph element (1400), GD = max number of dynamic roadgraph (16)
+def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD=16, GS=1400, is_local=True, halfwidth=50, only_veh=True, hidden='BP'): # GS = max number of static roadgraph element (1400), GD = max number of dynamic roadgraph (16)
     sampling_freq = int(sampling_time/0.1)
     assert sampling_freq == sampling_time/0.1
     states_batch = np.array([]).reshape(-1,time_steps,9)
 
     states_padding_batch = np.array([]).reshape(-1,time_steps)
-    states_hidden_BP_batch = np.array([]).reshape(-1,time_steps)
-    states_hidden_CBP_batch = np.array([]).reshape(-1,time_steps)
-    states_hidden_GDP_batch =np.array([]).reshape(-1,time_steps)
-
+    states_hidden_batch = np.array([]).reshape(-1,time_steps)
+    
     roadgraph_feat_batch = np.array([]).reshape(-1,time_steps,6)
     roadgraph_padding_batch = np.array([]).reshape(-1,time_steps)
 
@@ -380,6 +378,9 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
     num_agents = np.array([])
     num_rg = np.array([])
     num_tl = np.array([])
+
+    sdc_masks = []
+    center_ps = []
 
     for data in batch:
         # State of Agents
@@ -397,22 +398,29 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
         future_states_valid = data['state/future/valid'] > 0.
 
         states_feat = np.concatenate((past_states,current_states,future_states),axis=1)                             # [A,T,D]
-        states_padding = ~np.concatenate((past_states_valid,current_states_valid,future_states_valid), axis=1) # [A,T]
+        states_padding = ~np.concatenate((past_states_valid,current_states_valid,future_states_valid), axis=1)      # [A,T]
         states_feat = states_feat[:,::sampling_freq,:][:,:time_steps,:]
         states_padding = states_padding[:,::sampling_freq][:,:time_steps]
         states_feat[:,:,-1] = np.where(states_padding, states_feat[:,:,-1], states_feat[:,:,-1]/1e6)
 
+        sdc_mask = data['state/is_sdc'] == 1
+        sdvidx = np.where(sdc_mask)[0][0]
+
         # basic_mask = np.zeros((len(states_feat),time_steps)).astype(np.bool_)
-        states_hidden_BP = np.ones((len(states_feat),time_steps)).astype(np.bool_)
-        states_hidden_BP[:,:current_step+1] = False
-        sdvidx = np.where(data['state/is_sdc'] == 1)[0][0]
-        states_hidden_CBP = np.ones((len(states_feat),time_steps)).astype(np.bool_)
-        states_hidden_CBP[:,:current_step+1] = False
-        states_hidden_CBP[sdvidx,:] = False
-        states_hidden_GDP = np.ones((len(states_feat),time_steps)).astype(np.bool_)
-        states_hidden_GDP[:,:current_step+1] = False
-        states_hidden_GDP[sdvidx,-1] = False
-        # states_hidden_mask_CDP = np.zeros((len(states_feat),time_steps)).astype(np.bool_)
+        if hidden == 'BP':
+            states_hidden = np.ones((len(states_feat),time_steps)).astype(np.bool_)
+            states_hidden[:,:current_step+1] = False
+        elif hidden == 'CBP':
+            states_hidden = np.ones((len(states_feat),time_steps)).astype(np.bool_)
+            states_hidden[:,:current_step+1] = False
+            states_hidden[sdvidx,:] = False
+        elif hidden == 'GDP':
+            states_hidden = np.ones((len(states_feat),time_steps)).astype(np.bool_)
+            states_hidden[:,:current_step+1] = False
+            states_hidden[sdvidx,-1] = False
+        else:
+            raise KeyError('hidden should be BP or CBP or GDP')
+        
         
         # Static Road Graph
         roadgraph_feat = np.concatenate((data['roadgraph_samples/xyz'][:,:2], data['roadgraph_samples/dir'][:,:2],
@@ -440,12 +448,12 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
         traffic_light_valid = traffic_light_valid[:,::sampling_freq][:,:time_steps]
         traffic_light_padding = ~traffic_light_valid
 
+        center_p = states_feat[sdvidx,current_step,:2].copy()
+
         if is_local:
-            center_x, center_y = states_feat[sdvidx,current_step,:2]
-            
-            states_feat[:,:,:2] = np.where(np.tile(states_padding[:,:,None], (1,1,2)), states_feat[:,:,:2], (states_feat[:,:,:2]-np.array([center_x,center_y]))/halfwidth)
-            roadgraph_feat[:,:,:2] = np.where(np.tile(roadgraph_padding[:,:,None], (1,1,2)), roadgraph_feat[:,:,:2], (roadgraph_feat[:,:,:2]-np.array([center_x,center_y]))/halfwidth)
-            traffic_light_feat[:,:,:2] = np.where(np.tile(traffic_light_padding[:,:,None], (1,1,2)), traffic_light_feat[:,:,:2], (traffic_light_feat[:,:,:2]-np.array([center_x,center_y]))/halfwidth)
+            states_feat[:,:,:2] = np.where(np.tile(states_padding[:,:,None], (1,1,2)), states_feat[:,:,:2], (states_feat[:,:,:2]-center_p)/halfwidth)
+            roadgraph_feat[:,:,:2] = np.where(np.tile(roadgraph_padding[:,:,None], (1,1,2)), roadgraph_feat[:,:,:2], (roadgraph_feat[:,:,:2]-center_p)/halfwidth)
+            traffic_light_feat[:,:,:2] = np.where(np.tile(traffic_light_padding[:,:,None], (1,1,2)), traffic_light_feat[:,:,:2], (traffic_light_feat[:,:,:2]-center_p)/halfwidth)
             
             agent_xy_mask = (states_feat[:,:,:2] >= -1) * (states_feat[:,:,:2] <= 1)
             agent_xy_mask = agent_xy_mask[:,:,0]*agent_xy_mask[:,:,1]
@@ -462,17 +470,15 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
             traffic_light_feat[~tl_xy_mask] = -1
             traffic_light_padding += ~tl_xy_mask
 
+            center_p = states_feat[sdvidx,current_step,:2]
+
         if only_veh:
             # Mask only vehicles
             agent_types = data['state/type'] 
             agent_type_mask = agent_types==1
             states_feat = states_feat[agent_type_mask]
             states_padding = states_padding[agent_type_mask]
-
-            states_hidden_BP = states_hidden_BP[agent_type_mask]
-            states_hidden_CBP = states_hidden_CBP[agent_type_mask]
-            states_hidden_GDP = states_hidden_GDP[agent_type_mask]
-
+            states_hidden = states_hidden[agent_type_mask]
 
         if roadgraph_feat.shape[0] > GS:
             spacing = roadgraph_feat.shape[0] // GS
@@ -484,31 +490,32 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
             roadgraph_feat = roadgraph_feat[roadgraph_mask2]
             roadgraph_padding = np.zeros((GS,time_steps)).astype(np.bool_)
 
-        states_any_mask = states_padding.sum(axis=-1) != time_steps
+        # states_any_mask = states_padding.sum(axis=-1) != time_steps
+        states_any_mask = (states_padding + states_hidden).sum(-1) != time_steps
         states_feat = states_feat[states_any_mask]
         states_padding = states_padding[states_any_mask]
+        states_hidden = states_hidden[states_any_mask]
+
         roadgarph_any_mask = roadgraph_padding.sum(axis=-1) != time_steps
         roadgraph_feat = roadgraph_feat[roadgarph_any_mask]
         roadgraph_padding = roadgraph_padding[roadgarph_any_mask]
+
         tl_any_mask = traffic_light_padding.sum(axis=-1) != time_steps
         traffic_light_feat = traffic_light_feat[tl_any_mask]
         traffic_light_padding = traffic_light_padding[tl_any_mask]
-
-        states_hidden_BP = states_hidden_BP[states_any_mask]
-        states_hidden_CBP = states_hidden_CBP[states_any_mask]
-        states_hidden_GDP = states_hidden_GDP[states_any_mask]
 
         num_agents = np.append(num_agents, len(states_feat))
         num_rg = np.append(num_rg, roadgraph_feat.shape[0])
         num_tl = np.append(num_tl, traffic_light_feat.shape[0])
 
+        sdc_masks.append(torch.BoolTensor(sdc_mask))
+        center_ps.append(torch.FloatTensor(center_p))
+
         # Concat across batch
         states_batch = np.concatenate((states_batch,states_feat), axis=0)
         states_padding_batch = np.concatenate((states_padding_batch,states_padding), axis=0)
 
-        states_hidden_BP_batch = np.concatenate((states_hidden_BP_batch,states_hidden_BP), axis=0)
-        states_hidden_CBP_batch = np.concatenate((states_hidden_CBP_batch,states_hidden_CBP), axis=0)
-        states_hidden_GDP_batch =np.concatenate((states_hidden_GDP_batch,states_hidden_GDP), axis=0)
+        states_hidden_batch = np.concatenate((states_hidden_batch,states_hidden), axis=0)
 
         roadgraph_feat_batch = np.concatenate((roadgraph_feat_batch, roadgraph_feat), axis=0)
         roadgraph_padding_batch = np.concatenate((roadgraph_padding_batch, roadgraph_padding), axis=0)
@@ -529,63 +536,84 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
         agent_rg_mask[num_agents_accum[i]:num_agents_accum[i+1], num_rg_accum[i]:num_rg_accum[i+1]] = 0
         agent_traffic_mask[num_agents_accum[i]:num_agents_accum[i+1], num_tl_accum[i]:num_tl_accum[i+1]] = 0
 
-    states_batch = torch.FloatTensor(states_batch)
-    agents_batch_mask = torch.BoolTensor(agents_batch_mask)
-    states_padding_batch = torch.BoolTensor(states_padding_batch)
-    states_hidden_BP_batch = torch.BoolTensor(states_hidden_BP_batch)
-    states_hidden_CBP_batch = torch.BoolTensor(states_hidden_CBP_batch)
-    states_hidden_GDP_batch = torch.BoolTensor(states_hidden_GDP_batch)
+    states_batch = torch.FloatTensor(states_batch)                                  # [A,T,9] -> (x, y, bbox_yaw, vel_x, vel_y, vel_yaw, width, len, time)
+    agents_batch_mask = torch.BoolTensor(agents_batch_mask)                         # [A,A]
+    states_padding_batch = torch.BoolTensor(states_padding_batch)                   # [A,T]
+    states_hidden_batch = torch.BoolTensor(states_hidden_batch)
+    # states_hidden_BP_batch = torch.BoolTensor(states_hidden_BP_batch)               # [A,T]
+    # states_hidden_CBP_batch = torch.BoolTensor(states_hidden_CBP_batch)             # [A,T]
+    # states_hidden_GDP_batch = torch.BoolTensor(states_hidden_GDP_batch)             # [A,T]
     
-    roadgraph_feat_batch = torch.FloatTensor(roadgraph_feat_batch)
-    roadgraph_padding_batch = torch.BoolTensor(roadgraph_padding_batch)
-    traffic_light_feat_batch = torch.FloatTensor(traffic_light_feat_batch)
-    traffic_light_padding_batch = torch.BoolTensor(traffic_light_padding_batch)
+    roadgraph_feat_batch = torch.FloatTensor(roadgraph_feat_batch)                  # [GS,T,6] -> (x, y, dx, dy, type, id)
+    roadgraph_padding_batch = torch.BoolTensor(roadgraph_padding_batch)             # [GS,T]
+    traffic_light_feat_batch = torch.FloatTensor(traffic_light_feat_batch)          # [GD,T,3] -> (x, y, state)
+    traffic_light_padding_batch = torch.BoolTensor(traffic_light_padding_batch)     # [GD,T]
 
-    agent_rg_mask = torch.BoolTensor(agent_rg_mask)
-    agent_traffic_mask = torch.BoolTensor(agent_traffic_mask)   
+    agent_rg_mask = torch.BoolTensor(agent_rg_mask)                                 # [A,GS]
+    agent_traffic_mask = torch.BoolTensor(agent_traffic_mask)                       # [A,GD]
         
-    return (states_batch, agents_batch_mask, states_padding_batch, 
-                (states_hidden_BP_batch, states_hidden_CBP_batch, states_hidden_GDP_batch), 
-                    roadgraph_feat_batch, roadgraph_padding_batch, traffic_light_feat_batch, traffic_light_padding_batch,
-                        agent_rg_mask, agent_traffic_mask)
+    return {'agt_stat': states_batch, 'agt_batch_msk': agents_batch_mask, 'agt_pad_msk': states_padding_batch, 
+            'stat_hid_msk': states_hidden_batch, 
+            'rg_feat': roadgraph_feat_batch, 'rg_pad_msk': roadgraph_padding_batch, 
+            'tr_feat': traffic_light_feat_batch, 'tr_pad_msk': traffic_light_padding_batch,
+            'agt_rg_msk': agent_rg_mask, 'agt_tr_msk': agent_traffic_mask, 'num_accum': (num_agents_accum, num_rg_accum, num_tl_accum),
+            'sdc_msk': sdc_masks, 'ctr_p': center_ps}
 
-# def waymo_worker_fn(wid):
-#     worker_info = torch.utils.data.get_worker_info()
+def waymo_worker_fn(wid):
+    worker_info = torch.utils.data.get_worker_info()
     
-#     dataset = worker_info.dataset
-#     worker_id = worker_info.id
-#     assert len(dataset.splits) >= worker_info.num_workers, 'num_workers should be smaller than number of splits'
-#     split_size = len(dataset.splits) // worker_info.num_workers
+    dataset = worker_info.dataset
+    worker_id = worker_info.id
+    assert len(dataset.splits) >= worker_info.num_workers, 'num_workers should be smaller than number of splits'
+    split_size = len(dataset.splits) // worker_info.num_workers
 
-#     overall_end = len(dataset.splits)
-#     if not len(dataset.splits) - (worker_id+1)*split_size < split_size:
-#         dataset.splits = dict(list(dataset.splits.items())[worker_id*split_size:(worker_id+1)*split_size])
-#     else:
-#         dataset.splits = dict(list(dataset.splits.items())[worker_id*split_size:overall_end])
+    overall_end = len(dataset.splits)
+    if not len(dataset.splits) - (worker_id+1)*split_size < split_size:
+        dataset.splits = dict(list(dataset.splits.items())[worker_id*split_size:(worker_id+1)*split_size])
+    else:
+        dataset.splits = dict(list(dataset.splits.items())[worker_id*split_size:overall_end])
 
+def xy_to_pixel(xy, width, mask=True):
+    # assert type(xy) == torch.Tensor
+
+    xy[...,1] *= -1
+    xy += int(width/2)
+    # mask_x = (xy[...,0] <= width)*(xy[...,0]>=0)
+    # mask_y = (xy[...,1] <= width)*(xy[...,1]>=0)
+
+    # xy = xy[mask_x*mask_y]
+    # xy = torch.clamp(xy, min=0, max=width)
+
+    return xy
 
 if __name__ == '__main__':
     import hydra, os
+    import os.path as osp
     from torch.utils.data import DataLoader
     from tqdm import tqdm
+    import pytorch_lightning as pl
     @hydra.main(config_path='../conf', config_name='config.yaml')
     def main(cfg):
-        filename = '/home/user/daehee/SceneTransformer-pytorch/datautil/tmp.txt'
+        pl.seed_everything(cfg.seed)
+        filename = '/home/user/daehee/SceneTransformer-pytorch/datautil/tmp2.txt'
         if os.path.isfile(filename):
             os.remove(filename)
         f = open(filename, 'w')
-        pwd = hydra.utils.get_original_cwd() + '/'
-        dataset_train = WaymoDataset(pwd+cfg.dataset.train.tfrecords, pwd+cfg.dataset.train.idxs, shuffle_queue_size=None)
+        pwd = hydra.utils.get_original_cwd()
+        dataset_train = WaymoDataset(osp.join(pwd, cfg.dataset.train.tfrecords), osp.join(pwd, cfg.dataset.train.idxs), shuffle_queue_size=cfg.dataset.train.batchsize)
         # print(len(dataset_train))
-        dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, num_workers=2, shuffle=False)
+        dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, worker_init_fn=waymo_worker_fn, num_workers=3, shuffle=False)
         for ep in range(2):
             for it, d in enumerate(tqdm(dloader_train)):
                 # f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
-                d_ = torch.reshape(d[4],(-1,1400,10,6))
+                # d_ = torch.reshape(d[4],(-1,1400,10,6))
+                sample_rg = d['rg_feat'][0,0,:2]
                 # break
-                f.write(str(ep) + ' ' + str(it)+' : '+str(d_[:,0,0,:2])+'\n')
+                f.write(str(ep) + ' ' + str(it)+' : '+str(sample_rg)+'\n')
                 if it % 500 == 0:
-                    print(ep, ' ', it, ' : ', d[0][0][0][:2])
+                    print(ep, ' ', it, ' : ', d['agt_stat'][0][0])
+                # if it == 10:
+                #     break
         f.close()
     
     sys.exit(main())

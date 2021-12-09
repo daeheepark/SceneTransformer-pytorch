@@ -1,6 +1,7 @@
 mode: 'train' # 'train' or 'validate' or 'test'
+resume: '/home/user/daehee/SceneTransformer-pytorch/outputs/2021-12-07/18-47-20/lightning_logs/version_0/checkpoints/epoch=0-step=27395.ckpt' # None
 
-tag: 'halfwidth:50'
+tag: ''
 verbose: true
 seed: 1234
 
@@ -9,6 +10,10 @@ dataset:
     tfrecords: 'data/uncompressed/tf_example/training'
     idxs: 'data/tf_exmple_idxs/training/bs16'
     batchsize: 16
+    limit_train_batches: 1.0
+    limit_val_batches: 0.5
+    val_check_interval: 0.1
+    log_every_n_steps: 100
   valid:
     tfrecords: 'data/uncompressed/tf_example/validation'
     idxs: 'data/tf_exmple_idxs/validation/bs16'
@@ -17,16 +22,25 @@ dataset:
     tfrecords: 'data/uncompressed/tf_example/validation'
     idxs: 'data/tf_exmple_idxs/validation/bs1'
     batchsize: 1
-    ckpt_path: '/home/user/daehee/SceneTransformer-pytorch/outputs/2021-09-23/18-49-50_gpu45_local_veh_nogradclip/lightning_logs/version_0/checkpoints/epoch=11-step=359213.ckpt'
+    ckpt_path: '/home/user/daehee/SceneTransformer-pytorch/outputs/2021-09-27/21-16-47/lightning_logs/version_0/checkpoints/epoch=8-step=261799.ckpt'
+  halfwidth: 25
+  only_veh: true
+  hidden: 'BP'
 
+viz:
+  width: 500
 # dataset:
 #   train:
 #     tfrecords: 'data/single_sample/data'
 #     idxs: 'data/single_sample/idxs'
 #     batchsize: 8
 #   valid:
-#     tfrecords: 'data/tfrecords'
-#     idxs: 'data/idxs'
+#     tfrecords: 'data/single_sample/data'
+#     idxs: 'data/single_sample/idxs'
+#     batchsize: 8
+#   test:
+#     tfrecords: 'data/single_sample/data'
+#     idxs: 'data/single_sample/idxs'
 #     batchsize: 8
 
 model:
@@ -40,8 +54,7 @@ model:
   k: 4
   F: 6
 
-device_ids: '0,1'
-device_num: 2
+gpu_ids: [0,1]
 max_epochs: 100
 
 # hydra:

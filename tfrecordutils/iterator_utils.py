@@ -46,7 +46,8 @@ def sample_iterators(iterators: typing.List[typing.Iterator],
     ratios = np.array(ratios)
     ratios = ratios / ratios.sum()
     try:
-        choice = np.random.choice(len(ratios), p=ratios) 
+        # choice = np.random.choice(len(ratios), p=ratios) 
+        choice = 0
         while iterators:
             try:
                 yield next(iterators[choice])
@@ -55,7 +56,8 @@ def sample_iterators(iterators: typing.List[typing.Iterator],
                     del iterators[choice]
                     ratios = np.delete(ratios, choice)
                     ratios = ratios / ratios.sum()
-                    choice = np.random.choice(len(ratios), p=ratios) 
+                    # choice = np.random.choice(len(ratios), p=ratios) 
+                    choice = 0
 
     except ValueError:
         pass

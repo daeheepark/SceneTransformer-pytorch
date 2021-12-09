@@ -47,11 +47,11 @@ class Decoder(nn.Module):
         x = torch.cat((x,onehots_),dim=-1)                  # [F,A,T,D+F]
         x = self.layer_T(x)                                 # [F,A,T,D]
 
-        x = self.layer_U(x,batch_mask=batch_mask, padding_mask=padding_mask)
-        x = self.layer_V(x,batch_mask=batch_mask, padding_mask=padding_mask)
+        x = self.layer_U(x,batch_mask=batch_mask)#, padding_mask=padding_mask)
+        x = self.layer_V(x,batch_mask=batch_mask)#, padding_mask=padding_mask)
         
-        x = self.layer_W(x,batch_mask=batch_mask, padding_mask=padding_mask)
-        x = self.layer_X(x,batch_mask=batch_mask, padding_mask=padding_mask)
+        x = self.layer_W(x,batch_mask=batch_mask)#, padding_mask=padding_mask)
+        x = self.layer_X(x,batch_mask=batch_mask)#, padding_mask=padding_mask)
 
         x = self.layer_Y(x)
         x = self.layer_Z1(x)

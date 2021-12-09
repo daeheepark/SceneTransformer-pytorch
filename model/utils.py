@@ -59,7 +59,7 @@ class SelfAttLayer_Enc(nn.Module):
 
         if self.across_time:
             q_ = x_.permute(1,0,2)                          # [L,N,E] : [A,T,D]->[T,A,D]
-            k,v = x_.permute(1,0,2), x_.permute(1,0,2)      # [S,N,E] : [T,A,D]
+            k,v = x_.permute(1,0,2), x_.permute(1,0,2)      # [S,N,E] : [A,T,D]->[T,A,D]
 
             key_padding_mask = padding_mask                 # [N,S] : [A,T]
             attn_mask = None  

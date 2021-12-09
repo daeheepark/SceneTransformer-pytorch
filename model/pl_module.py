@@ -147,8 +147,7 @@ class SceneTransformer(pl.LightningModule):
                         num_agents_accum, num_rg_accum, num_tl_accum, center_ps, \
                             prediction, loss = outputs[0].values()
 
-        empty_mask = np.zeros((self.width,self.width))
-        total_empty = np.zeros((self.width,self.width,3))
+        total_empty = np.ones((self.width,self.width,3))*255
         current_step=3
         scene_imgs = []
 
@@ -188,7 +187,8 @@ class SceneTransformer(pl.LightningModule):
 
                 polygon = np.array([ctline_xy.numpy()], np.int32)
 
-                cv2.polylines(total_empty_, polygon, isClosed=False, color=(255,255,255), thickness=20)
+                cv2.polylines(total_empty_, polygon, isClosed=False, color=(20,20,20), thickness=1)
+                # cv2.polylines(total_empty_, polygon, isClosed=False, color=(255,255,255), thickness=20)
 
             for si_, (s_, p_, sp_, sh_) in enumerate(zip(states_, pred_, states_padding_, states_hidden_)):
                 s__ = s_[:,:2].clone() * (self.width/2)
@@ -204,6 +204,7 @@ class SceneTransformer(pl.LightningModule):
                     cv2.circle(img=total_empty_, center=tuple(s__[current_step].numpy().astype(np.int32)), radius=3, color=COLORS[si_%len(COLORS)], thickness=cv2.FILLED)
 
                     for p___ in p__:
+                        p___ = p___[~sp_[current_step:]]
                         mask_x = (p___[...,0] <= self.width)*(p___[...,0]>=0)
                         mask_y = (p___[...,1] <= self.width)*(p___[...,1]>=0)
                         p___ = p___[mask_x*mask_y]
@@ -350,9 +351,9 @@ class SceneTransformer(pl.LightningModule):
 
 @hydra.main(config_path='../conf', config_name='config.yaml')
 def test_valend(cfg):
-    from datautil.waymo_dataset import WaymoDataset, waymo_collate_fn
+    from datautil.waymo_dataset import WaymoDataset, waymo_collate_fn, waymo_worker_fn
     from model.pl_module import SceneTransformer
-
+    pl.seed_everything(cfg.seed)
     # trainer_args = {}
     trainer_args = {'max_epochs': cfg.max_epochs,
                     'gpus': [2,3],#cfg.gpu_ids,
@@ -368,7 +369,7 @@ def test_valend(cfg):
 
     pwd = hydra.utils.get_original_cwd()
     dataset_valid = WaymoDataset(osp.join(pwd, cfg.dataset.valid.tfrecords), osp.join(pwd, cfg.dataset.valid.idxs), shuffle_queue_size=None)
-    dloader_valid = DataLoader(dataset_valid, batch_size=cfg.dataset.valid.batchsize, shuffle=False, collate_fn=waymo_collate_fn, num_workers=cfg.dataset.valid.batchsize)
+    dloader_valid = DataLoader(dataset_valid, batch_size=cfg.dataset.valid.batchsize, shuffle=False, collate_fn=waymo_collate_fn, worker_init_fn=waymo_worker_fn, num_workers=2)
 
     trainer.validate(model=model, val_dataloaders=dloader_valid, verbose=True)
 

@@ -8,6 +8,7 @@ from random import shuffle
 import struct
 import typing
 
+from copy import deepcopy
 import numpy as np
 
 # from os import path

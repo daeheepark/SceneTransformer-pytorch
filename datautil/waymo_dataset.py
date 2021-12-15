@@ -564,7 +564,7 @@ def waymo_worker_fn(wid):
     
     dataset = worker_info.dataset
     worker_id = worker_info.id
-    assert len(dataset.splits) >= worker_info.num_workers, 'num_workers should be smaller than number of splits'
+    assert len(dataset.splits) >= worker_info.num_workers, f'num_workers ({worker_info.num_workers}) should be smaller than number of splits ({len(dataset.splits)})'
     split_size = len(dataset.splits) // worker_info.num_workers
 
     overall_end = len(dataset.splits)

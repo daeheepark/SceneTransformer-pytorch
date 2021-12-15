@@ -14,6 +14,12 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from datautil.waymo_dataset import WaymoDataset, waymo_collate_fn, waymo_worker_fn
 from model.pl_module import SceneTransformer
 
+torch.multiprocessing.set_sharing_strategy('file_system')
+# import resource
+# rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+# resource.setrlimit(resource.RLIMIT_NOFILE, (100, rlimit[1]))
+
+
 @hydra.main(config_path='./conf', config_name='config.yaml')
 def main(cfg):
     pl.seed_everything(cfg.seed)
@@ -45,14 +51,12 @@ def main(cfg):
         dataset_train = WaymoDataset(osp.join(pwd, cfg.dataset.train.tfrecords), osp.join(pwd, cfg.dataset.train.idxs), shuffle_queue_size=cfg.dataset.train.batchsize)
         dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, 
                                     collate_fn=lambda b: waymo_collate_fn(b, halfwidth=cfg.dataset.halfwidth, only_veh=cfg.dataset.only_veh, hidden=cfg.dataset.hidden),
-                                    worker_init_fn=waymo_worker_fn,  
-                                    num_workers=cfg.dataset.valid.batchsize)
+                                    num_workers=cfg.dataset.train.batchsize//2)
 
         dataset_valid = WaymoDataset(osp.join(pwd, cfg.dataset.valid.tfrecords), osp.join(pwd, cfg.dataset.valid.idxs), shuffle_queue_size=None)
         dloader_valid = DataLoader(dataset_valid, batch_size=cfg.dataset.valid.batchsize, 
                                     collate_fn=lambda b: waymo_collate_fn(b, halfwidth=cfg.dataset.halfwidth, only_veh=cfg.dataset.only_veh, hidden=cfg.dataset.hidden),
-                                    worker_init_fn=waymo_worker_fn,  
-                                    num_workers=cfg.dataset.valid.batchsize)
+                                    num_workers=cfg.dataset.valid.batchsize//2)
 
         trainer.fit(model, dloader_train, dloader_valid)
     elif cfg.mode == 'validate':

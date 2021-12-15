@@ -64,6 +64,10 @@ class Encoder(nn.Module):
 
         self.layer_P = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
         self.layer_Q = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
+
+        # self.layer_DH = nn.Sequential(nn.Linear(self.feature_dim,self.feature_dim*6), Permute4Batchnorm((0,2,1)),
+        #                     nn.BatchNorm1d(32), Permute4Batchnorm((0,2,1)), nn.ReLU())
+        # self.layer_DH.apply(init_xavier_glorot)
         
 
     def forward(self, state_feat, agent_batch_mask, padding_mask, hidden_mask, 

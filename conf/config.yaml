@@ -1,5 +1,5 @@
 mode: 'train' # 'train' or 'validate' or 'test'
-resume: '/home/user/daehee/SceneTransformer-pytorch/outputs/2021-12-07/18-47-20/lightning_logs/version_0/checkpoints/epoch=0-step=27395.ckpt' # None
+resume: '/home/user/daehee/SceneTransformer-pytorch/outputs/2021-12-09/17-25-35/lightning_logs/version_0/checkpoints/last.ckpt' # None
 
 tag: ''
 verbose: true
@@ -29,6 +29,7 @@ dataset:
 
 viz:
   width: 500
+  
 # dataset:
 #   train:
 #     tfrecords: 'data/single_sample/data'
@@ -52,9 +53,9 @@ model:
   in_static_rg_dim: 6
   head_num: 4
   k: 4
-  F: 6
+  F: 4
 
-gpu_ids: [0,1]
+gpu_ids: [2,3]
 max_epochs: 100
 
 # hydra:

@@ -195,7 +195,7 @@ class SceneTransformer(pl.LightningModule):
                 s__ = xy_to_pixel(s__, self.width)
                 p__ = p_.clone() * (self.width/2)
                 p__ = xy_to_pixel(p__[sh_], self.width)
-                curpt_ = s__[current_step].unsqueeze(0).repeat(6,1).unsqueeze(0)
+                curpt_ = s__[current_step].unsqueeze(0).repeat(self.cfg.model.F,1).unsqueeze(0)
                 p__ = torch.cat((curpt_, p__), 0).permute(1,0,2)
 
                 if not sp_[current_step]:
@@ -365,7 +365,7 @@ def test_valend(cfg):
 
     trainer = pl.Trainer(**trainer_args)
     model = SceneTransformer(cfg)
-    model = model.load_from_checkpoint(checkpoint_path=cfg.dataset.test.ckpt_path, cfg=cfg)
+    # model = model.load_from_checkpoint(checkpoint_path=cfg.dataset.test.ckpt_path, cfg=cfg)
 
     pwd = hydra.utils.get_original_cwd()
     dataset_valid = WaymoDataset(osp.join(pwd, cfg.dataset.valid.tfrecords), osp.join(pwd, cfg.dataset.valid.idxs), shuffle_queue_size=None)

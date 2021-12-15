@@ -17,10 +17,13 @@ class Decoder(nn.Module):
         self.k = k
         self.F = F
 
+        assert feature_dim//F == feature_dim/F
+        self.mdim = int((2*F+feature_dim)/2)
+
         onehots_ = torch.tensor(range(F))
         self.onehots_ = FU.one_hot(onehots_, num_classes=F).view(self.F,1,1,self.F)
 
-        self.layer_T = nn.Sequential(nn.Linear(self.feature_dim+self.F,feature_dim), nn.ReLU())
+        self.layer_T = nn.Sequential(nn.Linear(self.feature_dim//F+self.F,feature_dim), nn.ReLU())
         self.layer_T.apply(init_xavier_glorot)
 
         self.layer_U = SelfAttLayer_Dec(self.time_steps,self.feature_dim,self.head_num,self.k,across_time=True)
@@ -34,15 +37,18 @@ class Decoder(nn.Module):
         self.layer_Z1 = nn.Sequential(nn.Linear(self.feature_dim,6), nn.ReLU(), Permute4Batchnorm((1,3,0,2)),
                             nn.BatchNorm2d(6), Permute4Batchnorm((2,0,3,1))) 
         self.layer_Z1.apply(init_xavier_glorot)
-        self.layer_Z2 = nn.Linear(6,2)  # x, y
+        self.layer_Z2 = nn.Linear(6 ,2)  # x, y
 
     def forward(self, state_feat, batch_mask, padding_mask, hidden_mask=None):
         A,T,D = state_feat.shape
         assert (T==self.time_steps and D==self.feature_dim)
+        state_feat = state_feat.reshape((A,T,-1,self.F))
+        x = state_feat.permute(3,0,1,2)
+
         onehots_ = copy.deepcopy(self.onehots_)
         onehots_ = onehots_.repeat(1,A,T,1)
         onehots_ = onehots_.to(state_feat.device)
-        x = state_feat.unsqueeze(0).repeat(self.F,1,1,1)    # [F,A,T,D]
+        # x = state_feat.unsqueeze(0).repeat(self.F,1,1,1)    # [F,A,T,D]
 
         x = torch.cat((x,onehots_),dim=-1)                  # [F,A,T,D+F]
         x = self.layer_T(x)                                 # [F,A,T,D]

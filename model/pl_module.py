@@ -19,6 +19,7 @@ from model.decoder import Decoder
 from datautil.waymo_dataset import xy_to_pixel
 
 COLORS = [(0,0,255), (255,0,255), (180,180,0), (143,143,188), (0,100,0), (128,128,0)]
+TrajCOLORS = [(0,0,255), (200,0,0), (200,200,0), (0,200,0)]
 
 class SceneTransformer(pl.LightningModule):
     def __init__(self, cfg):
@@ -48,13 +49,14 @@ class SceneTransformer(pl.LightningModule):
                     roadgraph_feat_batch, roadgraph_padding_batch, traffic_light_feat_batch, traffic_light_padding_batch,
                         agent_rg_mask, agent_traffic_mask):
 
-        encodings = self.encoder(states_batch, agents_batch_mask, states_padding_mask_batch, states_hidden_mask_batch,
+        e = self.encoder(states_batch, agents_batch_mask, states_padding_mask_batch, states_hidden_mask_batch,
                                     roadgraph_feat_batch, roadgraph_padding_batch, traffic_light_feat_batch, traffic_light_padding_batch,
                                         agent_rg_mask, agent_traffic_mask)
+        encodings = e['out']
         # states_padding_mask_batch = states_padding_mask_batch + ~states_hidden_mask_batch
         decoding = self.decoder(encodings, agents_batch_mask, states_padding_mask_batch)
         
-        return decoding.permute(1,2,0,3)
+        return {'prediction': decoding.permute(1,2,0,3), 'att_weights': e['att_weights']}
 
     def training_step(self, batch, batch_idx):
 
@@ -64,9 +66,10 @@ class SceneTransformer(pl.LightningModule):
                             sdc_masks, center_ps = batch.values()
         
         # Predict
-        prediction = self(states_batch, agents_batch_mask, states_padding_mask_batch, states_hidden_mask_batch, 
+        out = self(states_batch, agents_batch_mask, states_padding_mask_batch, states_hidden_mask_batch, 
                         roadgraph_feat_batch, roadgraph_padding_batch, traffic_light_feat_batch, traffic_light_padding_batch,
                             agent_rg_mask, agent_traffic_mask)
+        prediction = out['prediction']
 
         # Calculate Loss
         to_predict_mask = ~states_padding_mask_batch*states_hidden_mask_batch
@@ -75,10 +78,21 @@ class SceneTransformer(pl.LightningModule):
         prediction = prediction[to_predict_mask]    
         #print(prediction) 
         loss_ = self.Loss(gt.unsqueeze(1).repeat(1,self.F,1), prediction)
-        loss_ = torch.min(torch.mean(torch.mean(loss_, dim=0),dim=-1)) * self.cfg.dataset.halfwidth
+        loss_ = torch.mean(torch.mean(loss_, dim=0),dim=-1) * self.cfg.dataset.halfwidth
+        # loss_ = torch.min(loss_) 
+        # if self.global_step < 8000:
+        #     k_=4
+        # elif self.global_step < 50000:
+        #     k_ = 2
+        # else:
+        #     k_ = 1
+        k_ = 1
+        loss_, _ = torch.topk(loss_, k_)
+        loss_ = torch.mean(loss_)
         self.log_dict({'train/loss':loss_})
         
-        return {'batch': batch, 'pred': prediction, 'gt': gt, 'loss': loss_}
+        # return {'batch': batch, 'pred': prediction, 'gt': gt, 'loss': loss_, 'att_weights': out['att_weights']}
+        return loss_
 
     def on_after_backward(self) -> None:
         valid_gradients = True
@@ -100,9 +114,10 @@ class SceneTransformer(pl.LightningModule):
                             sdc_masks, center_ps = batch.values()
         
         # Predict
-        prediction = self(states_batch, agents_batch_mask, states_padding_mask_batch, states_hidden_mask_batch, 
+        out = self(states_batch, agents_batch_mask, states_padding_mask_batch, states_hidden_mask_batch, 
                         roadgraph_feat_batch, roadgraph_padding_batch, traffic_light_feat_batch, traffic_light_padding_batch,
                             agent_rg_mask, agent_traffic_mask)
+        prediction = out['prediction']
 
         # Calculate Loss
         to_predict_mask = ~states_padding_mask_batch*states_hidden_mask_batch
@@ -135,35 +150,36 @@ class SceneTransformer(pl.LightningModule):
 
         self.log_dict({'val/loss': loss_, 'val/minade': batch_minade, 'val/minfde': batch_minfde, 'val/avgade': batch_avgade, 'val/avgfde': batch_avgfde})
 
-        return {'states': states_batch, 'states_padding': states_padding_mask_batch, 'states_hidden': states_hidden_mask_batch, 
-                'roadgraph_feat': roadgraph_feat_batch, 'roadgraph_padding': roadgraph_padding_batch, 
-                'traffic_light_feat': traffic_light_feat_batch, 'traffic_light_padding': traffic_light_padding_batch,
-                'num_agents_accum': num_agents_accum, 'num_rg_accum': num_rg_accum, 'num_tl_accum': num_tl_accum, 'center_ps': center_ps,
-                'pred': prediction, 'loss': loss_}
+        self.val_out =  {'states': states_batch, 'states_padding': states_padding_mask_batch, 'states_hidden': states_hidden_mask_batch, 
+                        'roadgraph_feat': roadgraph_feat_batch, 'roadgraph_padding': roadgraph_padding_batch, 
+                        'traffic_light_feat': traffic_light_feat_batch, 'traffic_light_padding': traffic_light_padding_batch,
+                        'num_agents_accum': num_agents_accum, 'num_rg_accum': num_rg_accum, 'num_tl_accum': num_tl_accum, 'sdc_masks': sdc_masks, 'center_ps': center_ps,
+                        'pred': prediction, 'loss': loss_, 'att_weights': out['att_weights']}
+
+        return loss_
 
     def validation_epoch_end(self, outputs) -> None:
         states_batch, states_padding_batch, states_hidden_batch, \
                     roadgraph_feat_batch, roadgraph_padding_batch, traffic_light_feat_batch, traffic_light_padding_batch, \
-                        num_agents_accum, num_rg_accum, num_tl_accum, center_ps, \
-                            prediction, loss = outputs[0].values()
+                        num_agents_accum, num_rg_accum, num_tl_accum, sdc_masks, center_ps, \
+                            prediction, loss, att_weights = self.val_out.values()
 
         total_empty = np.ones((self.width,self.width,3))*255
         current_step=3
         scene_imgs = []
 
-        for i in range(len(num_agents_accum)-1):
+        for ii, i in enumerate(range(len(num_agents_accum)-1)):
             total_empty_ = total_empty.copy()
-            start = num_agents_accum[i]
-            end = num_agents_accum[i+1]
-            states_, states_padding_, states_hidden_ = states_batch[start:end].cpu(), states_padding_batch[start:end].cpu(), states_hidden_batch[start:end].cpu()
-            pred_ = prediction[start:end].detach().cpu()
-            # roadgraph_feat_, roadgraph_padding_ = roadgraph_feat_batch[1400*i:1400*(i+1)].cpu(), roadgraph_padding_batch[1400*i:1400*(i+1)].cpu()
+
+            states_, states_padding_, states_hidden_ = states_batch[num_agents_accum[i]:num_agents_accum[i+1]].cpu(), states_padding_batch[num_agents_accum[i]:num_agents_accum[i+1]].cpu(), states_hidden_batch[num_agents_accum[i]:num_agents_accum[i+1]].cpu()
+            pred_ = prediction[num_agents_accum[i]:num_agents_accum[i+1]].detach().cpu()
             roadgraph_feat_, roadgraph_padding_ = roadgraph_feat_batch[num_rg_accum[i]:num_rg_accum[i+1]].cpu(), roadgraph_padding_batch[num_rg_accum[i]:num_rg_accum[i+1]].cpu()
-            
             roadgraph_type_, roadgraph_id_ = roadgraph_feat_[:,current_step,-2].cpu(), roadgraph_feat_[:,current_step,-1].cpu()
             traffic_light_, traffic_light_padding_ = traffic_light_feat_batch[num_tl_accum[i]:num_tl_accum[i+1]].cpu(), traffic_light_padding_batch[num_tl_accum[i]:num_tl_accum[i+1]].cpu()
-            center_p = center_ps[i].cpu()
+            agt_rg_attmp = att_weights[2][current_step][num_agents_accum[i]:num_agents_accum[i+1],num_rg_accum[i]:num_rg_accum[i+1]]
+            agt_tl_attmp = att_weights[3][current_step][num_agents_accum[i]:num_agents_accum[i+1],num_tl_accum[i]:num_tl_accum[i+1]]
 
+            center_p = center_ps[i].cpu()
             ctline_mask = (roadgraph_feat_[...,-2]==2)[:,0]
 
             # # Road 
@@ -203,14 +219,14 @@ class SceneTransformer(pl.LightningModule):
                     cv2.polylines(total_empty_, polygon, isClosed=False, color=COLORS[si_%len(COLORS)], thickness=2)
                     cv2.circle(img=total_empty_, center=tuple(s__[current_step].numpy().astype(np.int32)), radius=3, color=COLORS[si_%len(COLORS)], thickness=cv2.FILLED)
 
-                    for p___ in p__:
+                    for pi, p___ in enumerate(p__):
                         p___ = p___[~sp_[current_step:]]
                         mask_x = (p___[...,0] <= self.width)*(p___[...,0]>=0)
                         mask_y = (p___[...,1] <= self.width)*(p___[...,1]>=0)
                         p___ = p___[mask_x*mask_y]
                         # polygon.append(p___.numpy())
                         polygon = np.array([p___.numpy()], np.int32)
-                        cv2.polylines(total_empty_, polygon, isClosed=False, color=(200,0,0), thickness=1)
+                        cv2.polylines(total_empty_, polygon, isClosed=False, color=TrajCOLORS[pi], thickness=1)
 
                 else:
                     polygon = np.array([s__[~sp_].numpy()], np.int32)
@@ -353,10 +369,11 @@ class SceneTransformer(pl.LightningModule):
 def test_valend(cfg):
     from datautil.waymo_dataset import WaymoDataset, waymo_collate_fn, waymo_worker_fn
     from model.pl_module import SceneTransformer
+    torch.multiprocessing.set_sharing_strategy('file_system')
     pl.seed_everything(cfg.seed)
     # trainer_args = {}
     trainer_args = {'max_epochs': cfg.max_epochs,
-                    'gpus': [2,3],#cfg.gpu_ids,
+                    'gpus': [0],#cfg.gpu_ids,
                     'accelerator': 'ddp',
                     'val_check_interval': 0.2, 'limit_train_batches': 1.0, 
                     'limit_val_batches': 0.001,
@@ -369,7 +386,7 @@ def test_valend(cfg):
 
     pwd = hydra.utils.get_original_cwd()
     dataset_valid = WaymoDataset(osp.join(pwd, cfg.dataset.valid.tfrecords), osp.join(pwd, cfg.dataset.valid.idxs), shuffle_queue_size=None)
-    dloader_valid = DataLoader(dataset_valid, batch_size=cfg.dataset.valid.batchsize, shuffle=False, collate_fn=waymo_collate_fn, worker_init_fn=waymo_worker_fn, num_workers=2)
+    dloader_valid = DataLoader(dataset_valid, batch_size=cfg.dataset.valid.batchsize, shuffle=False, collate_fn=waymo_collate_fn, num_workers=0)
 
     trainer.validate(model=model, val_dataloaders=dloader_valid, verbose=True)
 

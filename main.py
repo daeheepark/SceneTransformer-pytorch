@@ -34,7 +34,7 @@ def main(cfg):
     model = SceneTransformer(cfg)
     checkpoint_callback = ModelCheckpoint(mode='min', monitor='val/loss', auto_insert_metric_name=True, verbose=True, save_last=True, save_top_k=3)
     checkpoint_callback_2 = ModelCheckpoint(mode='min', monitor='val/minfde', auto_insert_metric_name=True, verbose=True, save_last=True, save_top_k=3)
-    early_stopping = callbacks.EarlyStopping(monitor='val/loss', mode='min', patience=5)
+    early_stopping = callbacks.EarlyStopping(monitor='val/loss', mode='min', patience=10)
 
     trainer_args = {'max_epochs': cfg.max_epochs,
                     'gpus': cfg.gpu_ids,
@@ -42,8 +42,9 @@ def main(cfg):
                     'val_check_interval': cfg.dataset.train.val_check_interval, 'limit_train_batches': cfg.dataset.train.limit_train_batches, 
                     'limit_val_batches': cfg.dataset.train.limit_val_batches,
                     'log_every_n_steps': cfg.max_epochs, 'auto_lr_find': True,
-                    'callbacks': [checkpoint_callback, checkpoint_callback_2, early_stopping],
-                    'resume_from_checkpoint': cfg.resume}
+                    'callbacks': [checkpoint_callback, checkpoint_callback_2, early_stopping]}
+    if cfg.resume:
+        trainer_args['resume_from_checkpoint'] = cfg.resume
 
     trainer = pl.Trainer(**trainer_args)
 

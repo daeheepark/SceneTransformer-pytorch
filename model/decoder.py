@@ -23,7 +23,7 @@ class Decoder(nn.Module):
         onehots_ = torch.tensor(range(F))
         self.onehots_ = FU.one_hot(onehots_, num_classes=F).view(self.F,1,1,self.F)
 
-        self.layer_T = nn.Sequential(nn.Linear(self.feature_dim//F+self.F,feature_dim), nn.ReLU())
+        self.layer_T = nn.Sequential(nn.Linear(self.feature_dim*4//self.F+self.F,feature_dim), nn.ReLU())
         self.layer_T.apply(init_xavier_glorot)
 
         self.layer_U = SelfAttLayer_Dec(self.time_steps,self.feature_dim,self.head_num,self.k,across_time=True)
@@ -41,7 +41,7 @@ class Decoder(nn.Module):
 
     def forward(self, state_feat, batch_mask, padding_mask, hidden_mask=None):
         A,T,D = state_feat.shape
-        assert (T==self.time_steps and D==self.feature_dim)
+        # assert (T==self.time_steps and D==self.feature_dim)
         state_feat = state_feat.reshape((A,T,-1,self.F))
         x = state_feat.permute(3,0,1,2)
 

@@ -155,23 +155,20 @@ class CrossAttLayer_Enc(nn.Module):
     def forward(self, q_, kv, batch_mask, padding_mask=None, hidden_mask=None):
         A,T,D = q_.shape                                    # [L,N,E] : [A,T,D]
         assert (T==self.time_steps and D==self.feature_dim)
-        G,T,D = kv.shape                                    # [S,N,E] : [G,T,D]
-        assert (T==self.time_steps and D==self.feature_dim)
+        G,T_,D = kv.shape                                    # [S,N,E] : [G,T,D]
         A_,G_ = batch_mask.shape                            # [L,S] : [A,G]
         assert (A==A_ and G==G_)
         G__,T__ = padding_mask.shape                        
         padding_mask = padding_mask.permute(1,0)            # [N,S] : T,G
-        assert (G==G__ and T==T__)
+        assert (G==G__ and T_==T__)
 
         k, v = kv, kv
         # att_output : [L,N,E] : [A,T,D]
-        att_output,_ = self.layer_att_(q_,k,v,key_padding_mask=padding_mask,attn_mask=batch_mask)
-        # if torch.isnan(att_output.sum()):
-        #     import ipdb
-        #     ipdb.set_trace()
+        att_output, att_weight = self.layer_att_(q_,k,v,key_padding_mask=padding_mask,attn_mask=batch_mask)
+
         S_ = att_output + q_
         F1_ = self.layer_F1_(S_)
         #F2_ = self.layer_F2_(F1_)
         Z_ = self.layer_Z_(F1_)
 
-        return Z_
+        return Z_, att_weight[...,:-1]

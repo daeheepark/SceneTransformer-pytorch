@@ -65,9 +65,9 @@ class Encoder(nn.Module):
         self.layer_P = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=True)
         self.layer_Q = SelfAttLayer_Enc(self.time_steps, self.feature_dim, self.head_num, self.k, across_time=False)
 
-        # self.layer_DH = nn.Sequential(nn.Linear(self.feature_dim,self.feature_dim*6), Permute4Batchnorm((0,2,1)),
-        #                     nn.BatchNorm1d(32), Permute4Batchnorm((0,2,1)), nn.ReLU())
-        # self.layer_DH.apply(init_xavier_glorot)
+        self.layer_DH = nn.Sequential(nn.Linear(self.feature_dim,self.feature_dim*4), Permute4Batchnorm((0,2,1)),
+                            nn.BatchNorm1d(self.feature_dim*4), Permute4Batchnorm((0,2,1)), nn.ReLU())
+        self.layer_DH.apply(init_xavier_glorot)
         
 
     def forward(self, state_feat, agent_batch_mask, padding_mask, hidden_mask, 
@@ -89,18 +89,19 @@ class Encoder(nn.Module):
 
         # TODO : add additional artificial agent/time AND adjust mask for it
 
-        output = self.layer_J(output,C_,agent_rg_mask, roadgraph_valid, hidden_mask)
-        output = self.layer_K(output,B_,agent_traffic_mask, traffic_light_valid, hidden_mask)
+        output, att_weight_J = self.layer_J(output,C_,agent_rg_mask, roadgraph_valid, hidden_mask)
+        output, att_weight_K = self.layer_K(output,B_,agent_traffic_mask, traffic_light_valid, hidden_mask)
 
         output = self.layer_L(output,agent_batch_mask, padding_mask, hidden_mask)
         output = self.layer_M(output,agent_batch_mask, padding_mask, hidden_mask)
 
-        output = self.layer_N(output,C_,agent_rg_mask, roadgraph_valid, hidden_mask)
-        output = self.layer_O(output,B_,agent_traffic_mask, traffic_light_valid, hidden_mask)
+        output, att_weight_N = self.layer_N(output,C_,agent_rg_mask, roadgraph_valid, hidden_mask)
+        output, att_weight_O = self.layer_O(output,B_,agent_traffic_mask, traffic_light_valid, hidden_mask)
 
         output = self.layer_P(output,agent_batch_mask, padding_mask, hidden_mask)
         Q_ = self.layer_Q(output,agent_batch_mask, padding_mask, hidden_mask)
-        return Q_
+        Q_ = self.layer_DH(Q_)
+        return {'out': Q_, 'att_weights': (att_weight_J, att_weight_K, att_weight_N, att_weight_O)}
 
 
 

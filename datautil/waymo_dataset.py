@@ -1,5 +1,7 @@
 import math
 import os, sys
+import os.path as osp
+import hydra
 import uuid
 import time
 import random
@@ -479,6 +481,7 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
             states_feat = states_feat[agent_type_mask]
             states_padding = states_padding[agent_type_mask]
             states_hidden = states_hidden[agent_type_mask]
+            sdc_mask = sdc_mask[agent_type_mask]
 
         if roadgraph_feat.shape[0] > GS:
             spacing = roadgraph_feat.shape[0] // GS
@@ -495,6 +498,7 @@ def waymo_collate_fn(batch, time_steps=10, current_step=3, sampling_time=0.5, GD
         states_feat = states_feat[states_any_mask]
         states_padding = states_padding[states_any_mask]
         states_hidden = states_hidden[states_any_mask]
+        sdc_mask = sdc_mask[states_any_mask]
 
         roadgarph_any_mask = roadgraph_padding.sum(axis=-1) != time_steps
         roadgraph_feat = roadgraph_feat[roadgarph_any_mask]
@@ -586,35 +590,47 @@ def xy_to_pixel(xy, width, mask=True):
 
     return xy
 
-if __name__ == '__main__':
-    import hydra, os
-    import os.path as osp
+@hydra.main(config_path='../conf', config_name='config.yaml')
+def test1(cfg):
     from torch.utils.data import DataLoader
     from tqdm import tqdm
     import pytorch_lightning as pl
-    @hydra.main(config_path='../conf', config_name='config.yaml')
-    def main(cfg):
-        pl.seed_everything(cfg.seed)
-        filename = '/home/user/daehee/SceneTransformer-pytorch/datautil/tmp2.txt'
-        if os.path.isfile(filename):
-            os.remove(filename)
-        f = open(filename, 'w')
-        pwd = hydra.utils.get_original_cwd()
-        dataset_train = WaymoDataset(osp.join(pwd, cfg.dataset.train.tfrecords), osp.join(pwd, cfg.dataset.train.idxs), shuffle_queue_size=cfg.dataset.train.batchsize)
-        # print(len(dataset_train))
-        dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, worker_init_fn=waymo_worker_fn, num_workers=3, shuffle=False)
-        for ep in range(2):
-            for it, d in enumerate(tqdm(dloader_train)):
-                # f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
-                # d_ = torch.reshape(d[4],(-1,1400,10,6))
-                sample_rg = d['rg_feat'][0,0,:2]
-                # break
-                f.write(str(ep) + ' ' + str(it)+' : '+str(sample_rg)+'\n')
-                if it % 500 == 0:
-                    print(ep, ' ', it, ' : ', d['agt_stat'][0][0])
-                # if it == 10:
-                #     break
-        f.close()
-    
-    sys.exit(main())
 
+    pl.seed_everything(cfg.seed)
+    filename = '/home/user/daehee/SceneTransformer-pytorch/datautil/tmp2.txt'
+    if os.path.isfile(filename):
+        os.remove(filename)
+    f = open(filename, 'w')
+    pwd = hydra.utils.get_original_cwd()
+    dataset_train = WaymoDataset(osp.join(pwd, cfg.dataset.train.tfrecords), osp.join(pwd, cfg.dataset.train.idxs), shuffle_queue_size=cfg.dataset.train.batchsize)
+    # print(len(dataset_train))
+    dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, worker_init_fn=waymo_worker_fn, num_workers=3, shuffle=False)
+    for ep in range(2):
+        for it, d in enumerate(tqdm(dloader_train)):
+            # f.write(f'{ep} {it} : '+str(d[0][0][0][:2])+'\n')
+            # d_ = torch.reshape(d[4],(-1,1400,10,6))
+            sample_rg = d['rg_feat'][0,0,:2]
+            # break
+            f.write(str(ep) + ' ' + str(it)+' : '+str(sample_rg)+'\n')
+            if it % 500 == 0:
+                print(ep, ' ', it, ' : ', d['agt_stat'][0][0])
+            # if it == 10:
+            #     break
+    f.close()
+
+@hydra.main(config_path='../conf', config_name='config.yaml')
+def dset_stat(cfg):
+    from torch.utils.data import DataLoader
+    from tqdm import tqdm
+    import pytorch_lightning as pl
+
+    pl.seed_everything(cfg.seed)
+
+    pwd = hydra.utils.get_original_cwd()
+    dataset_train = WaymoDataset(osp.join(pwd, cfg.dataset.train.tfrecords), osp.join(pwd, cfg.dataset.train.idxs), shuffle_queue_size=cfg.dataset.train.batchsize)
+    # print(len(dataset_train))
+    dloader_train = DataLoader(dataset_train, batch_size=cfg.dataset.train.batchsize, collate_fn=waymo_collate_fn, worker_init_fn=waymo_worker_fn, num_workers=3, shuffle=False)
+
+if __name__ == '__main__':
+    sys.exit(dset_stat())
+    

@@ -1,4 +1,4 @@
-# SceneTransformer-pytorch
+# SceneTransformer-pytorch (Unofficial)
 ## 1. Install dependencies
 * python==3.7
 * pytorch==1.9.0

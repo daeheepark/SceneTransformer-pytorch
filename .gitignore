@@ -4,3 +4,5 @@ outputs/*
 *.pyc
 *.swp
 example/*
+waymo_open_dataset/
+uncompressed

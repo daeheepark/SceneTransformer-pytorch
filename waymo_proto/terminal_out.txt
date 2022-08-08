@@ -1,0 +1,78 @@
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I .. --python_out . protos/scenario.proto
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls
+BUILD   dataset_pb2.py  __init__.py   label.proto  map_pb2.py  metrics  __pycache__      utils
+common  dataset.proto   label_pb2.py  latency      math        protos   scenario_pb2.py
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  python tmp3_.py     Traceback (most recent call last):
+  File "tmp3_.py", line 20, in <module>
+    scenario_.ParseFromString(f.read())
+google.protobuf.message.DecodeError: Error parsing message
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  du -h ../uncompressed --/*max-depth=0
+zsh: no matches found: --/*max-depth=0
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  du -h ../uncompressed --/* max-depth=0
+zsh: no matches found: --/*
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  du -h ../uncompressed//* --max-depth=0
+
+620G    ../uncompressed//scenario
+789G    ../uncompressed//tf_example
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls /mnt/ssd2/waymo_open_dataset_motion_v_1_1_0
+uncompressed
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls /mnt/ssd2/waymo_open_dataset_motion_v_1_1_0/uncompressed
+scenario  tf_example
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls BUILD   dataset_pb2.py  __init__.py   label.proto  map_pb2.py  metrics  __pycache__      tmp3.ipynb  utils
+common  dataset.proto   label_pb2.py  latency      math        protos   scenario_pb2.py  tmp3_.py
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls
+BUILD   dataset_pb2.py  __init__.py   label.proto  map_pb2.py  metrics  __pycache__      tmp3.ipynb  utils
+common  dataset.proto   label_pb2.py  latency      math        protos   scenario_pb2.py  tmp3_.py
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  gsutil --help    (scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  gsutil -m cp gs://waymo_open_dataset_motion_v_1_1_0/uncompressed/scenario/training/training.tfrecord-00000-of-01000 .
+Copying gs://waymo_open_dataset_motion_v_1_1_0/uncompressed/scenario/training/training.tfrecord-00000-of-01000...
+==> NOTE: You are downloading one or more large file(s), which would
+run significantly faster if you enabled sliced object downloads. This
+feature is enabled by default but requires that compiled crcmod be
+installed (see "gsutil help crcmod").
+
+| [1/1 files][392.3 MiB/392.3 MiB] 100% Done   8.8 MiB/s ETA 00:00:00
+Operation completed over 1 objects/392.3 MiB.
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I ../ --python_out . protos/scenario.proto
+protos/scenario.proto: File does not reside within any path specified using --proto_path (or -I).  You must specify a --proto_path which encompasses this file.  Note that the proto_path must be an exact prefix of the .proto file names -- protoc is too dumb to figure out when two paths (e.g. absolute and relative) are equivalent (it's harder than you think).
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  lsBUILD           dataset.proto  label.proto  math     __pycache__      tmp3_.py
+common          __init__.py    latency      metrics  scenario_pb2.py  training.tfrecord-00000-of-01000
+dataset_pb2.py  label_pb2.py   map_pb2.py   protos   tmp3.ipynb       utils
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  rm -r protos/*.py   (scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls
+BUILD           dataset.proto  label.proto  math     __pycache__      tmp3_.py
+common          __init__.py    latency      metrics  scenario_pb2.py  training.tfrecord-00000-of-01000
+dataset_pb2.py  label_pb2.py   map_pb2.py   protos   tmp3.ipynb       utils
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I ../ --python_out . protos/scenario.proto
+protos/scenario.proto: File does not reside within any path specified using --proto_path (or -I).  You must specify a --proto_path which encompasses this file.  Note that the proto_path must be an exact prefix of the .proto file names -- protoc is too dumb to figure out when two paths (e.g. absolute and relative) are equivalent (it's harder than you think).
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I ../ --python_out . protos/scenario.proto
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos --python_out . protos/scenario.proto
+waymo_open_dataset/protos/map.proto: File not found.
+scenario.proto:22:1: Import "waymo_open_dataset/protos/map.proto" was not found or had errors.
+scenario.proto:75:12: "TrafficSignalLaneState" is not defined.
+scenario.proto:126:12: "MapFeature" is not defined.
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . --python_out . protos/scenario.proto
+waymo_open_dataset/protos/map.proto: File not found.
+scenario.proto:22:1: Import "waymo_open_dataset/protos/map.proto" was not found or had errors.
+scenario.proto:75:12: "TrafficSignalLaneState" is not defined.
+scenario.proto:126:12: "MapFeature" is not defined.
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/scenario.proto
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls
+BUILD           dataset.proto  label.proto  math     __pycache__      tmp3_.py
+common          __init__.py    latency      metrics  scenario_pb2.py  training.tfrecord-00000-of-01000
+dataset_pb2.py  label_pb2.py   map_pb2.py   protos   tmp3.ipynb       utils
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/scena.proto
+(scene)  ✘ user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls protos       breakdown.proto  map.proto
+ motion_metrics.proto     __pycache__     submission.proto
+BUILD            metrics.proto  motion_submission.proto  scenario.proto  tmp2.ipynb
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/breakdown.proto
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/motion_metrics.proto
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/submission.proto
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/metrics.proto
+metrics.proto:25:1: warning: Import waymo_open_dataset/protos/scenario.proto is unused.
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/motion_submission.proto
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/scenario.proto
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  ls
+breakdown_pb2.py  dataset.proto  latency     metrics_pb2.py            __pycache__        tmp3_.py
+BUILD             __init__.py    map_pb2.py  motion_metrics_pb2.py     scenario_pb2.py    training.tfrecord-00000-of-01000
+common            label_pb2.py   math        motion_submission_pb2.py  submission_pb2.py  utils
+dataset_pb2.py    label.proto    metrics     protos                    tmp3.ipynb
+(scene)  user@user-vilab-daehee-60  ~/daehee/SceneTransformer-pytorch/waymo_open_dataset   main  protoc -I protos -I . -I ..  --python_out . protos/map.proto
